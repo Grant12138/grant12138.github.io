@@ -1,1 +1,3 @@
-# grant12138.github.io
+# Hi, welcome to [Grant Luo](https://www.linkedin.com/in/grantluo12138/)'s personal website
+
+Cool stuff coming soon...
