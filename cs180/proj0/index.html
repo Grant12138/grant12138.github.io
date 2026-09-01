@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CS 180 Project 0 — Grant Luo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #fdfdfc;
+      --fg: #1a1a1a;
+      --fg-muted: #5c5c5c;
+      --border: #e5e5e5;
+      --accent: #2563eb;
+      --accent-bg: #eff6ff;
+      --section-gap: 5rem;
+      --content-width: 720px;
+      --wide-width: 960px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--fg);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    img { display: block; max-width: 100%; height: auto; }
+    a { color: var(--accent); }
+
+    /* ── Layout ───────────────────────────────────── */
+    .container {
+      max-width: var(--content-width);
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+    .wide { max-width: var(--wide-width); }
+
+    /* ── Header ───────────────────────────────────── */
+    header {
+      padding: 3.5rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+    }
+    header .container { text-align: center; }
+    .course-tag {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    h1 {
+      font-family: 'Newsreader', Georgia, serif;
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+    .subtitle {
+      color: var(--fg-muted);
+      font-size: 1.05rem;
+      max-width: 540px;
+      margin: 0 auto 1.5rem;
+    }
+    .meta {
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+    }
+    .meta span + span::before {
+      content: "·";
+      margin: 0 0.5rem;
+    }
+
+    /* ── Sections ─────────────────────────────────── */
+    section {
+      padding: var(--section-gap) 0;
+      border-bottom: 1px solid var(--border);
+    }
+    section:last-of-type { border-bottom: none; }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      font-family: 'Newsreader', Georgia, serif;
+      font-size: clamp(1.5rem, 3.5vw, 2rem);
+      font-weight: 500;
+      line-height: 1.25;
+      letter-spacing: -0.015em;
+      margin-bottom: 1rem;
+    }
+    section > .container > p {
+      color: var(--fg-muted);
+      margin-bottom: 1rem;
+    }
+    section > .container > p:last-of-type {
+      margin-bottom: 0;
+    }
+
+    /* ── Comparison grid (Part 1) ─────────────────── */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin: 2rem auto;
+      max-width: var(--wide-width);
+      padding: 0 1.5rem;
+    }
+    .comparison figure {
+      text-align: center;
+    }
+    .comparison img {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .comparison figcaption {
+      margin-top: 0.75rem;
+      font-size: 0.88rem;
+    }
+    .comparison figcaption strong {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.15rem;
+    }
+    .comparison figcaption span {
+      color: var(--fg-muted);
+    }
+
+    /* ── Explanation callout ──────────────────────── */
+    .explanation {
+      background: var(--accent-bg);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 6px 6px 0;
+      padding: 1.25rem 1.5rem;
+      margin: 2rem 0;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: var(--fg);
+    }
+    .explanation strong {
+      font-weight: 600;
+    }
+
+    /* ── Placeholder (Part 2) ─────────────────────── */
+    .placeholder {
+      margin: 2rem auto;
+      max-width: var(--wide-width);
+      padding: 3rem 2rem;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      text-align: center;
+      color: var(--fg-muted);
+    }
+    .placeholder p {
+      margin: 0.5rem 0 0;
+      font-size: 0.95rem;
+    }
+    .placeholder .placeholder-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      opacity: 0.5;
+    }
+
+    /* ── GIF showcase (Part 3) ────────────────────── */
+    .gif-showcase {
+      margin: 2rem auto;
+      max-width: var(--wide-width);
+      padding: 0 1.5rem;
+    }
+    .gif-showcase img {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .gif-caption {
+      text-align: center;
+      margin-top: 0.75rem;
+      font-size: 0.88rem;
+      color: var(--fg-muted);
+    }
+
+    /* ── Frame strip ──────────────────────────────── */
+    .frame-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 2rem auto;
+      max-width: var(--wide-width);
+      padding: 0 1.5rem;
+    }
+    .frame-strip figure {
+      text-align: center;
+    }
+    .frame-strip img {
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .frame-strip figcaption {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--fg-muted);
+      font-weight: 500;
+    }
+
+    /* ── Footer ───────────────────────────────────── */
+    footer {
+      padding: 2.5rem 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Responsive ───────────────────────────────── */
+    @media (max-width: 640px) {
+      :root { --section-gap: 3.5rem; }
+      .comparison { grid-template-columns: 1fr; gap: 2rem; }
+      .frame-strip { grid-template-columns: 1fr; gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container">
+      <div class="course-tag">CS 180 · Project 0</div>
+      <h1>Perspective &amp; the Camera</h1>
+      <p class="subtitle">
+        From portrait distortion to the dolly zoom, a study of how camera distance and focal length shape perspective
+      </p>
+      <p class="meta">
+        <span>Grant Luo</span>
+        <span>Fall 2026</span>
+        <span>UC Berkeley</span>
+      </p>
+    </div>
+  </header>
+
+  <!-- ─── Part 1 ────────────────────────────────── -->
+  <section>
+    <div class="container">
+      <p class="section-label">Part 1</p>
+      <h2>Selfie: The Wrong Way vs. The Right Way</h2>
+      <p>
+        Two portraits of the same person, framed to roughly the same face size.
+        In the first, the camera is held close. In
+        the second, the camera is several feet away and zoomed in.
+      </p>
+    </div>
+
+    <div class="comparison">
+      <figure>
+        <img src="media/close-up.jpg" alt="Close-up selfie showing perspective distortion">
+        <figcaption>
+          <strong>Close up, no zoom</strong>
+          <span>Face appears wider, nose more prominent</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="media/zoomed.jpg" alt="Portrait taken from farther away with zoom, showing more natural proportions">
+        <figcaption>
+          <strong>Farther away, zoomed in</strong>
+          <span>More natural proportions, where features appear flatter and truer to life</span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="container">
+      <div class="explanation">
+        <strong>Why does this happen?</strong> When the camera is close, the nose is
+        proportionally much nearer to the lens than the ears. This difference in
+        relative distance causes the nose to appear larger.
+        Stepping back makes all facial features roughly equidistant from the camera,
+        largely eliminating the distortion.
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Part 2 ────────────────────────────────── -->
+  <section>
+    <div class="container">
+      <p class="section-label">Part 2</p>
+      <h2>Architectural Perspective Compression</h2>
+      <p>
+        The same experiment, reversed, featuring Hilgard Hall at UC Berkeley: a distant zooming view of a building
+        compresses depth, while a close wide-angle view reveals it.
+      </p>
+    </div>
+
+    <div class="comparison">
+      <figure>
+        <img src="media/building-telephoto.jpg" alt="Building photographed from far away with telephoto zoom, facade appears flattened">
+        <figcaption>
+          <strong>Far away, zoomed in</strong>
+          <span>The facade looks flattened, where columns and walls appear compressed into the same plane</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="media/building-wide.jpg" alt="Same building photographed from closer with wide angle, showing depth and perspective">
+        <figcaption>
+          <strong>Close up, no zoom</strong>
+          <span>Depth is restored, where the receding walls and columns clearly separate in space</span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="container">
+      <div class="explanation">
+        <strong>Why does the first image look flattened?</strong> From far away, every part
+        of the building is at roughly the same relative distance from the camera. The
+        zooming magnifies the scene but preserves that uniformity, so the front columns and the
+        side walls appear compressed into one plane. Walking closer makes the front of the
+        building proportionally much nearer than the sides, restoring the depth cues that
+        reveal the building's three-dimensional form.
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Part 3 ────────────────────────────────── -->
+  <section>
+    <div class="container">
+      <p class="section-label">Part 3</p>
+      <h2>The Dolly Zoom</h2>
+      <p>
+        By moving the camera backward while simultaneously zooming in, the subject
+        (a stuffed seal) stays roughly the same size in the frame, but the background
+        changes dramatically, appearing to compress or expand.
+      </p>
+    </div>
+
+    <div class="gif-showcase">
+      <img src="media/dolly-zoom.gif" alt="Animated dolly zoom: the stuffed seal stays the same size while the background perspective shifts">
+    </div>
+
+    <div class="frame-strip">
+      <figure>
+        <img src="media/dolly-01.jpg" alt="Frame 1: camera close, wide angle — background objects appear large and distant">
+        <figcaption>Frame 1 — Close / wide</figcaption>
+      </figure>
+      <figure>
+        <img src="media/dolly-05.jpg" alt="Frame 5: mid-transition">
+        <figcaption>Frame 5 — Mid</figcaption>
+      </figure>
+      <figure>
+        <img src="media/dolly-09.jpg" alt="Frame 9: camera far, telephoto — background appears compressed and closer">
+        <figcaption>Frame 9 — Far / telephoto</figcaption>
+      </figure>
+    </div>
+
+    <div class="container">
+      <div class="explanation">
+        <strong>Why does the background change?</strong> The zoom compensates for the
+        increasing distance to the subject, keeping the seal the same size. But the
+        background, being farther away than the seal, doesn't shrink at the same rate
+        as the camera retreats, making it appear to loom closer and flatten.
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>
