@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CS 180 Project 1: colorizing the Prokudin-Gorskii photo collection with single-scale and image-pyramid alignment.">
+  <title>Images of the Russian Empire — CS 180 Project 1</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%231b1b1b'/%3E%3Crect x='6' y='7' width='6' height='18' fill='%234b73c0'/%3E%3Crect x='13' y='7' width='6' height='18' fill='%23589461'/%3E%3Crect x='20' y='7' width='6' height='18' fill='%23b65345'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <p class="eyebrow">CS 180 · Project 1 · Fall 2026</p>
+      <h1>Images of the Russian Empire</h1>
+      <p class="lede">Colorizing the Prokudin-Gorskii photo collection by aligning three glass-plate exposures.</p>
+      <p class="byline">Grant Luo</p>
+      <nav aria-label="Page sections">
+        <a href="#approach">Approach</a>
+        <a href="#single-scale">Single-scale</a>
+        <a href="#multi-scale">Multi-scale</a>
+        <a href="#extras">Extra images</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="approach" class="text-section">
+      <h2>Approach</h2>
+      <p>
+        Each digitized plate contains three grayscale exposures in vertical order: blue, green, and red.
+        I split the plate into three equal-height layers, hold blue fixed, and independently translate green
+        and red until each best matches blue. Reported offsets use <code>(dx, dy)</code>, where positive
+        <code>dx</code> moves right and positive <code>dy</code> moves down.
+      </p>
+
+      <div class="method-grid">
+        <article>
+          <h3>Matching metric</h3>
+          <p>
+            Every candidate is scored with normalized cross-correlation (NCC). Before scoring, I exclude
+            10% from each plate edge, or a larger margin when required by the search displacement. This keeps
+            the original plate borders and shifted rollover pixels from dominating the comparison.
+          </p>
+        </article>
+        <article>
+          <h3>Single-scale search</h3>
+          <p>
+            For the three small JPEGs, I exhaustively test every horizontal and vertical displacement from
+            −15 through 15 pixels and select the shift with the largest NCC score.
+          </p>
+        </article>
+        <article>
+          <h3>Image-pyramid search</h3>
+          <p>
+            Large plates are repeatedly halved with area interpolation. I search ±15 pixels at the coarsest
+            level, double that displacement at each finer level, and refine it within ±2 pixels. The selected
+            full-resolution shifts are applied before stacking the channels in OpenCV BGR order.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="single-scale" class="results-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-number">01</p>
+          <h2>Single-scale alignment</h2>
+        </div>
+        <p>Exhaustive NCC search on the three low-resolution JPEG plates.</p>
+      </div>
+
+      <div class="gallery gallery-three">
+        <figure class="result-card">
+          <a href="images/single_scale_cathedral.jpg"><img src="images/single_scale_cathedral.jpg" alt="Single-scale colorization of Cathedral" loading="lazy"></a>
+          <figcaption><strong>Cathedral</strong><span>G → B: (2, 5) · R → B: (3, 12)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/single_scale_monastery.jpg"><img src="images/single_scale_monastery.jpg" alt="Single-scale colorization of Monastery" loading="lazy"></a>
+          <figcaption><strong>Monastery</strong><span>G → B: (2, −3) · R → B: (2, 3)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/single_scale_tobolsk.jpg"><img src="images/single_scale_tobolsk.jpg" alt="Single-scale colorization of Tobolsk" loading="lazy"></a>
+          <figcaption><strong>Tobolsk</strong><span>G → B: (3, 3) · R → B: (3, 6)</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="multi-scale" class="results-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-number">02</p>
+          <h2>Multi-scale alignment</h2>
+        </div>
+        <p>Coarse-to-fine NCC alignment on all supplied example plates. Select an image to view it at full size.</p>
+      </div>
+
+      <div class="gallery">
+        <figure class="result-card">
+          <a href="images/multiscale_cathedral.jpg"><img src="images/multiscale_cathedral.jpg" alt="Multi-scale colorization of Cathedral" loading="lazy"></a>
+          <figcaption><strong>Cathedral</strong><span>G → B: (2, 5) · R → B: (3, 12)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_church.jpg"><img src="images/multiscale_church.jpg" alt="Multi-scale colorization of Church" loading="lazy"></a>
+          <figcaption><strong>Church</strong><span>G → B: (4, 25) · R → B: (−4, 58)</span></figcaption>
+        </figure>
+        <figure class="result-card result-card-failed">
+          <a href="images/multiscale_emir.jpg"><img src="images/multiscale_emir.jpg" alt="Multi-scale colorization of Emir showing a failed red-channel alignment" loading="lazy"></a>
+          <figcaption><strong>Emir <em>alignment failure</em></strong><span>G → B: (24, 49) · R → B: (−205, 141)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_harvesters.jpg"><img src="images/multiscale_harvesters.jpg" alt="Multi-scale colorization of Harvesters" loading="lazy"></a>
+          <figcaption><strong>Harvesters</strong><span>G → B: (17, 60) · R → B: (13, 124)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_icon.jpg"><img src="images/multiscale_icon.jpg" alt="Multi-scale colorization of Icon" loading="lazy"></a>
+          <figcaption><strong>Icon</strong><span>G → B: (17, 41) · R → B: (23, 89)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_ilemselga.jpg"><img src="images/multiscale_ilemselga.jpg" alt="Multi-scale colorization of Ilemselga" loading="lazy"></a>
+          <figcaption><strong>Ilemselga</strong><span>G → B: (7, 40) · R → B: (11, 130)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_melons.jpg"><img src="images/multiscale_melons.jpg" alt="Multi-scale colorization of Melons" loading="lazy"></a>
+          <figcaption><strong>Melons</strong><span>G → B: (11, 82) · R → B: (13, 178)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_monastery.jpg"><img src="images/multiscale_monastery.jpg" alt="Multi-scale colorization of Monastery" loading="lazy"></a>
+          <figcaption><strong>Monastery</strong><span>G → B: (2, −3) · R → B: (2, 3)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_religous_painting.jpg"><img src="images/multiscale_religous_painting.jpg" alt="Multi-scale colorization of a religious painting" loading="lazy"></a>
+          <figcaption><strong>Religious Painting</strong><span>G → B: (3, 28) · R → B: (7, 68)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_self_portrait.jpg"><img src="images/multiscale_self_portrait.jpg" alt="Multi-scale colorization of Self Portrait" loading="lazy"></a>
+          <figcaption><strong>Self Portrait</strong><span>G → B: (29, 79) · R → B: (37, 176)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_siren.jpg"><img src="images/multiscale_siren.jpg" alt="Multi-scale colorization of Siren" loading="lazy"></a>
+          <figcaption><strong>Siren</strong><span>G → B: (−6, 49) · R → B: (−25, 96)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_three_generations.jpg"><img src="images/multiscale_three_generations.jpg" alt="Multi-scale colorization of Three Generations" loading="lazy"></a>
+          <figcaption><strong>Three Generations</strong><span>G → B: (14, 53) · R → B: (11, 112)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_tobolsk.jpg"><img src="images/multiscale_tobolsk.jpg" alt="Multi-scale colorization of Tobolsk" loading="lazy"></a>
+          <figcaption><strong>Tobolsk</strong><span>G → B: (3, 3) · R → B: (3, 6)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_wharf.jpg"><img src="images/multiscale_wharf.jpg" alt="Multi-scale colorization of Wharf" loading="lazy"></a>
+          <figcaption><strong>Wharf</strong><span>G → B: (−7, 15) · R → B: (−16, 83)</span></figcaption>
+        </figure>
+      </div>
+
+      <aside class="failure-note">
+        <h3>Why Emir fails</h3>
+        <p>
+          The red layer is visibly misplaced. Emir’s clothing has very different intensities in the red and
+          blue exposures, so raw-pixel NCC treats an incorrect location as the strongest match. A feature-based
+          comparison, such as image edges, would be less sensitive to this cross-channel brightness difference.
+        </p>
+      </aside>
+    </section>
+
+    <section id="extras" class="results-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-number">03</p>
+          <h2>Extra images</h2>
+        </div>
+        <p>Four additional plates from the Prokudin-Gorskii collection, aligned with the same pyramid method.</p>
+      </div>
+
+      <div class="gallery gallery-four">
+        <figure class="result-card">
+          <a href="images/multiscale_extra_image_1.jpg"><img src="images/multiscale_extra_image_1.jpg" alt="Multi-scale colorization of extra image 1" loading="lazy"></a>
+          <figcaption><strong>Extra Image 1</strong><span>G → B: (1, −3) · R → B: (1, −4)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_extra_image_2.jpg"><img src="images/multiscale_extra_image_2.jpg" alt="Multi-scale colorization of extra image 2" loading="lazy"></a>
+          <figcaption><strong>Extra Image 2</strong><span>G → B: (0, 4) · R → B: (−1, 15)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_extra_image_3.jpg"><img src="images/multiscale_extra_image_3.jpg" alt="Multi-scale colorization of extra image 3" loading="lazy"></a>
+          <figcaption><strong>Extra Image 3</strong><span>G → B: (5, 3) · R → B: (11, 8)</span></figcaption>
+        </figure>
+        <figure class="result-card">
+          <a href="images/multiscale_extra_image_4.jpg"><img src="images/multiscale_extra_image_4.jpg" alt="Multi-scale colorization of extra image 4" loading="lazy"></a>
+          <figcaption><strong>Extra Image 4</strong><span>G → B: (1, 5) · R → B: (3, 12)</span></figcaption>
+        </figure>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>CS 180: Intro to Computer Vision and Computational Photography</p>
+    </div>
+  </footer>
+</body>
+</html>
