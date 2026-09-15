@@ -14,9 +14,10 @@
       <p class="eyebrow">CS 180 · Project 1 · Fall 2026</p>
       <h1>Images of the Russian Empire</h1>
       <p class="lede">Colorizing the Prokudin-Gorskii photo collection by aligning three glass-plate exposures.</p>
-      <p class="byline">Grant Luo</p>
+      <p class="byline">by Grant Luo</p>
       <nav aria-label="Page sections">
-        <a href="#approach">Approach</a>
+        <a href="#background">Background</a>
+        <a href="#metric">Matching metric</a>
         <a href="#single-scale">Single-scale</a>
         <a href="#multi-scale">Multi-scale</a>
         <a href="#extras">Extra images</a>
@@ -25,40 +26,85 @@
   </header>
 
   <main class="wrap">
-    <section id="approach" class="text-section">
-      <h2>Approach</h2>
+    <section id="background" class="text-section">
+      <h2>Background</h2>
       <p>
-        Each digitized plate contains three grayscale exposures in vertical order: blue, green, and red.
-        I split the plate into three equal-height layers, hold blue fixed, and independently translate green
-        and red until each best matches blue. Reported offsets use <code>(dx, dy)</code>, where positive
-        <code>dx</code> moves right and positive <code>dy</code> moves down.
+        In the early 1900s, Sergei Mikhailovich Prokudin-Gorskii set out to document the Russian Empire in
+        color, decades before color film was commercially available. His method was elegantly simple: photograph
+        the same scene three times in rapid succession, each time through a different color filter (blue, green,
+        and red). The result was a single glass plate carrying three vertically stacked grayscale exposures.
+        Viewed through a special projector, the three strips would recombine into a full-color image. The
+        Library of Congress later digitized these plates, preserving the stacked B–G–R layout.
+      </p>
+      <p>
+        In this project, I explore two algorithms for aligning the layers, where the second one builds on top of the first one, improving time complexity. Recovering color from these digitized plates starts with splitting each one into its three equal-height
+        strips and assigning them to the corresponding color channel. But naively stacking the strips produces
+        noticeable artifacts such as colored fringes around edges and ghosted outlines throughout the image. These
+        misalignments arise because the three exposures were taken sequentially: slight camera motion between
+        shots, movement within the scene, and imprecision during scanning all shift the same object to
+        slightly different pixel coordinates in each channel. The core challenge of this project is to find, for
+        each of the green and red channels, the horizontal and vertical translation that best aligns it to the
+        blue channel. Offsets are reported as <code>(dx,&nbsp;dy)</code>, where positive <code>dx</code> is
+        rightward and positive <code>dy</code> is downward.
+      </p>
+    </section>
+
+    <section id="metric" class="text-section">
+      <h2>Matching metric</h2>
+      <p>
+        Finding the right alignment means searching over many candidate translations, so I need a way to
+        score how well two channels overlap at a given offset. A natural first thought might be evaluating the L2-norm, but L2-norm is sensitive to global brightness shifts between channels; for example, a uniformly
+        brighter green channel would penalize even a perfectly aligned pair. Instead, I use
+        <strong>normalized cross-correlation (NCC)</strong>. Given a fixed interior region <var>A</var> from
+        the blue anchor and the equally sized region <var>C</var> from a shifted candidate channel, NCC is
+        defined as:
       </p>
 
-      <div class="method-grid">
-        <article>
-          <h3>Matching metric</h3>
-          <p>
-            Every candidate is scored with normalized cross-correlation (NCC). Before scoring, I exclude
-            10% from each plate edge, or a larger margin when required by the search displacement. This keeps
-            the original plate borders and shifted rollover pixels from dominating the comparison.
-          </p>
-        </article>
-        <article>
-          <h3>Single-scale search</h3>
-          <p>
-            For the three small JPEGs, I exhaustively test every horizontal and vertical displacement from
-            −15 through 15 pixels and select the shift with the largest NCC score.
-          </p>
-        </article>
-        <article>
-          <h3>Image-pyramid search</h3>
-          <p>
-            Large plates are repeatedly halved with area interpolation. I search ±15 pixels at the coarsest
-            level, double that displacement at each finer level, and refine it within ±2 pixels. The selected
-            full-resolution shifts are applied before stacking the channels in OpenCV BGR order.
-          </p>
-        </article>
+      <div class="equation-block">
+        <math display="block" aria-label="NCC of A and C equals the dot product of their mean-subtracted values divided by the product of their L2 norms">
+          <mrow>
+            <mi>NCC</mi><mo>(</mo><mi>A</mi><mo>,</mo><mi>C</mi><mo>)</mo><mo>=</mo>
+            <mfrac>
+              <mrow>
+                <mo>(</mo><mi>A</mi><mo>−</mo><msub><mi>μ</mi><mi>A</mi></msub><mo>)</mo>
+                <mo>·</mo>
+                <mo>(</mo><mi>C</mi><mo>−</mo><msub><mi>μ</mi><mi>C</mi></msub><mo>)</mo>
+              </mrow>
+              <mrow>
+                <msub>
+                  <mrow><mo>‖</mo><mi>A</mi><mo>−</mo><msub><mi>μ</mi><mi>A</mi></msub><mo>‖</mo></mrow>
+                  <mn>2</mn>
+                </msub>
+                <mo> </mo>
+                <msub>
+                  <mrow><mo>‖</mo><mi>C</mi><mo>−</mo><msub><mi>μ</mi><mi>C</mi></msub><mo>‖</mo></mrow>
+                  <mn>2</mn>
+                </msub>
+              </mrow>
+            </mfrac>
+          </mrow>
+        </math>
       </div>
+
+      <p>
+        Both arrays are flattened into vectors of pixel intensities. Subtracting each vector's mean makes the
+        score invariant to one channel being globally brighter or darker than the other — a common occurrence,
+        since each filter transmits a different fraction of the scene's light. Dividing by the L2 norms further
+        removes any dependence on overall contrast, so the dot product purely measures whether bright and dark
+        spatial patterns fall in corresponding locations. The result ranges from −1 (inverted patterns) to 1
+        (identical patterns), and the candidate offset that maximizes it is selected as the alignment.
+      </p>
+
+      <p>
+        One practical detail: the glass plates have thick dark borders from the physical frame, and shifting a
+        channel can roll pixels from one edge to the opposite side. Both of these introduce strong, artificial
+        features that would dominate the correlation if included. To prevent this, I crop at least 10% from
+        every edge before computing NCC, or a wider margin when the candidate displacement exceeds that 10%
+        threshold. This ensures the score reflects genuine scene content rather than plate boundaries. That
+        said, NCC still fundamentally assumes the two channels share similar spatial intensity structure, an
+        assumption that breaks down when a subject's appearance differs drastically across wavelengths, as
+        we will see with the Emir photograph.
+      </p>
     </section>
 
     <section id="single-scale" class="results-section">
@@ -68,6 +114,17 @@
           <h2>Single-scale alignment</h2>
         </div>
         <p>Exhaustive NCC search on the three low-resolution JPEG plates.</p>
+      </div>
+
+      <div class="algorithm-note">
+        <h3>Search procedure</h3>
+        <p>
+          The three JPEG plates are small enough (roughly 300–400 pixels per channel) that brute force is
+          perfectly tractable. For each of the green and red channels, I test every integer displacement
+          <code>dx</code> and <code>dy</code> in the range [−15, 15], evaluating all 31 × 31 = 961 candidate
+          offsets. The shift that produces the highest NCC score is selected. Green and red are searched
+          independently against blue.
+        </p>
       </div>
 
       <div class="gallery gallery-three">
@@ -92,7 +149,40 @@
           <p class="section-number">02</p>
           <h2>Multi-scale alignment</h2>
         </div>
-        <p>Coarse-to-fine NCC alignment on all supplied example plates. Select an image to view it at full size.</p>
+        <p>
+          The single-scale method searches a fixed ±15-pixel window, which is sufficient for the small JPEGs
+          because their true displacements are small (at most ~12 pixels). But the TIF plates are roughly 10×
+          larger in each dimension, and the true offsets scale proportionally — some exceed 170 pixels — so a
+          ±15-pixel window simply cannot reach the correct alignment. We could widen the window, but the cost
+          is quadratic: a ±180-pixel search evaluates 361² ≈ 130,000 candidates per channel, each requiring
+          an NCC computation over a multi-megapixel image. That quickly becomes impractical. To this end, I use a serach algorithm that uses a image pyramid.
+        </p>
+      </div>
+
+      <div class="algorithm-note algorithm-note-steps">
+        <h3>Image-pyramid search</h3>
+        <ol class="algorithm-steps">
+          <li><strong>Build the pyramid.</strong> Starting from the full-resolution channel, repeatedly halve
+            the width and height using area interpolation (which averages pixel blocks, avoiding aliasing
+            artifacts) until the longest dimension falls to 256 pixels or below. This produces a stack of
+            progressively coarser versions of the same image.</li>
+          <li><strong>Search coarsely.</strong> At the coarsest level, run the same exhaustive search used
+            for single-scale — all offsets from −15 through 15. Because the image has been downsampled by
+            a large factor, this ±15-pixel window actually covers a much wider range in the original
+            coordinates, letting us find large shifts cheaply.</li>
+          <li><strong>Refine upward.</strong> Moving to the next-finer level, double the best offset found
+            so far (since coordinates double with each upsampling step), then search a tight ±2-pixel
+            neighborhood around that prediction. This local refinement corrects any rounding from the
+            coarser level. Repeat until full resolution is reached.</li>
+        </ol>
+        <p>
+          The key idea is that downsampling compresses large displacements into small ones — a 170-pixel shift
+          at full resolution becomes roughly 10 pixels after 4 levels of halving, well within the ±15 window.
+          The coarse level finds the approximate alignment, and each refinement step only needs to correct for
+          rounding and fine-scale detail, requiring just a 5 × 5 local search. Total work is roughly
+          961 + 25 × (number of pyramid levels), orders of magnitude less than brute-forcing the full
+          displacement range at full resolution.
+        </p>
       </div>
 
       <div class="gallery">
@@ -157,9 +247,12 @@
       <aside class="failure-note">
         <h3>Why Emir fails</h3>
         <p>
-          The red layer is visibly misplaced. Emir’s clothing has very different intensities in the red and
-          blue exposures, so raw-pixel NCC treats an incorrect location as the strongest match. A feature-based
-          comparison, such as image edges, would be less sensitive to this cross-channel brightness difference.
+          The Emir result is a clear failure. The red channel lands at (−205, 141), wildly off from
+          the true alignment. The root cause is that the Emir’s richly colored robe reflects light very
+          differently across wavelengths. Specifically, regions that appear bright in the blue exposure are dark in the red,
+          and vice versa. NCC is designed to find where intensity patterns match, but here the patterns are
+          nearly inverted between channels. The algorithm confidently locks onto a spurious displacement where
+          unrelated features happen to correlate better than the true position.
         </p>
       </aside>
     </section>
@@ -170,7 +263,7 @@
           <p class="section-number">03</p>
           <h2>Extra images</h2>
         </div>
-        <p>Four additional plates from the Prokudin-Gorskii collection, aligned with the same pyramid method.</p>
+        <p>Four additional plates from the Prokudin-Gorskii collection, aligned with the same pyramid method. Enjoy!</p>
       </div>
 
       <div class="gallery gallery-four">

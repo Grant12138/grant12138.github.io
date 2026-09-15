@@ -144,25 +144,101 @@ code {
   font-size: 0.9em;
 }
 
-.method-grid {
+.plate-flow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  margin-top: 42px;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
 }
 
-.method-grid article {
-  padding: 24px;
+.plate-flow div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  padding: 20px 24px;
 }
 
-.method-grid article + article {
+.plate-flow div + div {
   border-left: 1px solid var(--rule);
 }
 
-.method-grid p {
-  margin-bottom: 0;
+.plate-flow span {
+  grid-row: 1 / 3;
+  color: var(--accent);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.plate-flow strong {
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.plate-flow small {
   color: var(--muted);
-  font-size: 0.93rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.equation-block {
+  max-width: 900px;
+  margin: 30px 0;
+  padding: 25px 24px;
+  overflow-x: auto;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: #fff;
+}
+
+.equation-block math {
+  min-width: max-content;
+  margin-inline: auto;
+  font-size: 1.25rem;
+}
+
+.equation-small {
+  max-width: 760px;
+}
+
+.algorithm-note {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.32fr) minmax(0, 1fr);
+  gap: 26px;
+  margin: -4px 0 36px;
+  padding: 22px 24px;
+  border-left: 3px solid #aaa49a;
+  background: var(--panel);
+}
+
+.algorithm-note h3,
+.algorithm-note p {
+  margin-bottom: 0;
+}
+
+.algorithm-note p,
+.algorithm-steps {
+  color: #45423e;
+  font-size: 0.94rem;
+}
+
+.algorithm-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.algorithm-steps li + li {
+  margin-top: 8px;
+}
+
+.algorithm-note-steps {
+  grid-template-columns: minmax(150px, 0.32fr) minmax(0, 1fr);
+}
+
+.algorithm-note-steps p {
+  grid-column: 2;
+  margin-top: 14px;
 }
 
 .section-heading {
@@ -286,13 +362,23 @@ footer p {
     padding-top: 44px;
   }
 
-  .method-grid {
+  .plate-flow {
     grid-template-columns: 1fr;
   }
 
-  .method-grid article + article {
+  .plate-flow div + div {
     border-top: 1px solid var(--rule);
     border-left: 0;
+  }
+
+  .algorithm-note,
+  .algorithm-note-steps {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .algorithm-note-steps p {
+    grid-column: 1;
   }
 
   .section-heading {
