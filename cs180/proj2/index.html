@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CS 180 Project 2</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, sans-serif;
+      line-height: 1.55;
+    }
+
+    body {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.2;
+    }
+
+    h2 {
+      margin-top: 40px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    }
+
+    .images {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+    }
+
+    .images .wide {
+      grid-column: 1 / -1;
+    }
+
+    .images.spectra {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .images.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .images.six {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .images.six figcaption,
+    .images.three figcaption {
+      font-size: 0.85em;
+    }
+
+    figure {
+      margin: 0;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    figcaption {
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th, td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 14px;
+      background: color-mix(in srgb, currentColor 7%, transparent);
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    @media (max-width: 620px) {
+      .images {
+        grid-template-columns: 1fr;
+      }
+
+      .images.spectra {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .images.three,
+      .images.six {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Project 2: Fun with Filters and Frequencies</h1>
+
+    <h2>Part 1.1: Convolutions from Scratch</h2>
+    <p>
+      I implemented 2D convolution using NumPy in two ways: a direct version
+      with four loops and a version with two loops that uses NumPy to compute
+      each window's weighted sum. Both implementations flip the filter and use
+      zero padding. The results below use a 480&times;640 grayscale working copy
+      of my photograph.
+    </p>
+
+    <div class="images">
+      <figure>
+        <img src="assets/selfie-grayscale.jpg" alt="Original grayscale portrait">
+        <figcaption>Original grayscale image</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/selfie-box-blur.jpg" alt="Portrait blurred with a 9 by 9 box filter">
+        <figcaption>9&times;9 box filter</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/selfie-dx.png" alt="Signed horizontal derivative of the portrait">
+        <figcaption>Finite difference D<sub>x</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/selfie-dy.png" alt="Signed vertical derivative of the portrait">
+        <figcaption>Finite difference D<sub>y</sub></figcaption>
+      </figure>
+    </div>
+
+    <h3>Implementation</h3>
+    <p>
+      A shared helper flips the kernel and pads the image. The four-loop version
+      computes each product explicitly:
+    </p>
+    <pre><code>for y in range(output_height):
+    for x in range(output_width):
+        pixel_value = 0
+        for kernel_y in range(kernel_height):
+            for kernel_x in range(kernel_width):
+                pixel_value += (
+                    padded_image[y + kernel_y, x + kernel_x]
+                    * flipped_kernel[kernel_y, kernel_x]
+                )
+        output[y, x] = pixel_value</code></pre>
+
+    <p>The two-loop version delegates the inner calculation to NumPy:</p>
+    <pre><code>for y in range(output_height):
+    for x in range(output_width):
+        window = padded_image[
+            y:y + kernel_height,
+            x:x + kernel_width,
+        ]
+        output[y, x] = np.sum(window * flipped_kernel)</code></pre>
+
+    <h3>Comparison</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Implementation</th>
+          <th>Time</th>
+          <th>Matches SciPy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Four loops</td>
+          <td>3.317 s</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Two loops</td>
+          <td>0.379 s</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td><code>scipy.signal.convolve2d</code></td>
+          <td>0.019 s</td>
+          <td>Reference</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      The two-loop version was about 8.8&times; faster than the four-loop
+      version, while SciPy was about 19&times; faster than the two-loop version.
+      Both custom outputs matched SciPy within floating-point precision; their
+      largest absolute errors were below 3&times;10<sup>&minus;13</sup>.
+    </p>
+    <p>
+      For boundaries, I used zero-filled “same” padding so the output keeps the
+      input dimensions. This assumes pixels beyond the photograph are black,
+      which causes the thin dark frame visible in the blurred result.
+    </p>
+
+    <h2>Part 1.2: Finite Difference Operator</h2>
+    <p>
+      I convolved the cameraman image with D<sub>x</sub> and D<sub>y</sub>, then
+      computed the gradient magnitude as
+      √(D<sub>x</sub><sup>2</sup> + D<sub>y</sub><sup>2</sup>).
+    </p>
+
+    <div class="images">
+      <figure>
+        <img src="assets/cameraman-grayscale.png" alt="Original grayscale cameraman image">
+        <figcaption>Original image</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-dx.png" alt="Horizontal derivative of the cameraman image">
+        <figcaption>Partial derivative D<sub>x</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-dy.png" alt="Vertical derivative of the cameraman image">
+        <figcaption>Partial derivative D<sub>y</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-gradient-magnitude.png" alt="Gradient magnitude of the cameraman image">
+        <figcaption>Gradient magnitude</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-edges.png" alt="Binarized edges from the cameraman image">
+        <figcaption>Binarized edges, threshold = 50</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      I chose a threshold of 50. It preserves the important outlines of the
+      person, camera, tripod, and buildings while removing most weak changes in
+      the sky and clothing. A lower threshold retained more detail but also much
+      more grass and image noise; a higher threshold began removing real,
+      lower-contrast edges. Some grass texture remains at this threshold as the
+      tradeoff for keeping those weaker object boundaries.
+    </p>
+
+    <h2>Part 1.3: Derivative of Gaussian Filter</h2>
+    <p>
+      I formed a 9&times;9 Gaussian filter with σ = 2 using
+      <code>cv2.getGaussianKernel</code> and an outer product. I first blurred
+      the cameraman image, then applied D<sub>x</sub> and D<sub>y</sub> to the
+      blurred result.
+    </p>
+
+    <div class="images">
+      <figure>
+        <img src="assets/gaussian-filter.png" alt="Nine by nine Gaussian filter">
+        <figcaption>Gaussian filter</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-gaussian-blur.png" alt="Gaussian-blurred cameraman image">
+        <figcaption>Gaussian-blurred image</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-smoothed-gradient-magnitude.png" alt="Gradient magnitude after Gaussian smoothing">
+        <figcaption>Smoothed gradient magnitude</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-smoothed-edges.png" alt="Binarized edges after Gaussian smoothing">
+        <figcaption>Smoothed edges, threshold = 30</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      Compared with the finite-difference result in Part 1.2, Gaussian
+      smoothing removes many high-frequency responses in the grass and other
+      textured regions. The remaining boundaries are cleaner and slightly
+      thicker. I lowered the threshold from 50 to 30 because smoothing also
+      reduces the gradient magnitudes.
+    </p>
+
+    <h3>Derivative-of-Gaussian filters</h3>
+    <p>
+      I convolved the Gaussian with D<sub>x</sub> and D<sub>y</sub> to create
+      two derivative-of-Gaussian filters. Each one combines smoothing and
+      differentiation into a single convolution.
+    </p>
+
+    <div class="images">
+      <figure>
+        <img src="assets/dog-x-filter.png" alt="Derivative-of-Gaussian filter in the x direction">
+        <figcaption>DoG<sub>x</sub> filter</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/dog-y-filter.png" alt="Derivative-of-Gaussian filter in the y direction">
+        <figcaption>DoG<sub>y</sub> filter</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-dog-gradient-magnitude.png" alt="Gradient magnitude computed with derivative-of-Gaussian filters">
+        <figcaption>Single-pass DoG gradient magnitude</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      Away from the padded boundary, the two-pass and single-pass derivatives
+      agree to floating-point precision: their maximum difference is below
+      2&times;10<sup>&minus;13</sup>. The border can differ because the two-pass
+      version crops to “same” size between its two convolutions.
+    </p>
+
+    <h2>Part 2.1: Image Sharpening</h2>
+    <p>
+      I blurred each image with the 9&times;9 Gaussian filter from Part 1.3 and
+      extracted its high frequencies as <code>H = I − G * I</code>. The
+      sharpened image is <code>I + αH</code>. I combined those steps into one
+      convolution using the unsharp-mask filter
+      <code>(1 + α)δ − αG</code>.
+    </p>
+
+    <div class="images">
+      <figure>
+        <img src="assets/taj-original.jpg" alt="Original Taj Mahal image">
+        <figcaption>Original Taj Mahal</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/taj-blurred.jpg" alt="Gaussian-blurred Taj Mahal image">
+        <figcaption>Gaussian low frequencies</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/taj-high-frequency.png" alt="High-frequency component of the Taj Mahal image">
+        <figcaption>High-frequency component</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/taj-sharpened-0_5.jpg" alt="Taj Mahal sharpened with amount 0.5">
+        <figcaption>Sharpened, α = 0.5</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/taj-sharpened-1_0.jpg" alt="Taj Mahal sharpened with amount 1">
+        <figcaption>Sharpened, α = 1</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/taj-sharpened-2_0.jpg" alt="Taj Mahal sharpened with amount 2">
+        <figcaption>Sharpened, α = 2</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      Increasing α makes the dome, arches, and facade patterns more distinct.
+      The α = 0.5 result is subtle, α = 1 is stronger, and α = 2 begins to show
+      harsher contrast and slight halos. Sharpening emphasizes existing high
+      frequencies; it does not create genuinely new detail.
+    </p>
+
+    <h3>Blur and resharpen evaluation</h3>
+    <div class="images">
+      <figure>
+        <img src="assets/cameraman-original-2_1.png" alt="Original cameraman image before artificial blurring">
+        <figcaption>Original sharp image</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-artificially-blurred.png" alt="Artificially blurred cameraman image">
+        <figcaption>Artificially blurred</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cameraman-resharpened.png" alt="Cameraman image sharpened after artificial blurring">
+        <figcaption>Resharpened, α = 2</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      Resharpening restores much of the edge contrast around the subject,
+      camera, and tripod, but the result remains less detailed than the original
+      and develops visible halos. Once blurring removes high-frequency
+      information, unsharp masking can amplify what remains but cannot perfectly
+      reconstruct what was lost.
+    </p>
+
+    <h2>Part 2.2: Hybrid Images</h2>
+    <p>
+      A hybrid image combines the low frequencies of one image with the high
+      frequencies of another. Up close, the fine detail of the high-frequency
+      image dominates. From farther away, or when the image is shrunk, that
+      detail becomes too small to see, and the smooth shapes of the
+      low-frequency image take over.
+    </p>
+    <p>
+      For each pair, I picked the eye centers by hand and used a similarity
+      transform (scale, rotation, translation) to map the low-frequency image
+      onto the high-frequency image's frame. Aligning into the high-frequency
+      frame means the fine details are never resampled. The low-pass result is
+      a Gaussian blur with standard deviation σ<sub>low</sub>. The high-pass
+      result is the image minus its own Gaussian blur with
+      σ<sub>high</sub> (an impulse minus a Gaussian). The hybrid is their sum.
+    </p>
+    <p>
+      To turn σ into a cutoff frequency: a Gaussian with spatial standard
+      deviation σ has frequency response
+      exp(−2π²σ²f²), which drops to one half at
+      f<sub>c</sub> = √(ln 2 / 2) / (πσ) ≈ 0.187 / σ cycles per pixel. The
+      matching high-pass filter rises to one half at the same frequency. I
+      report each cutoff both as f<sub>c</sub> and as its period 1/f<sub>c</sub>
+      in pixels, which is easier to compare against features such as the
+      distance between the eyes.
+    </p>
+
+    <h3>Favorite result: selfie and Einstein</h3>
+    <p>
+      Einstein supplies the low frequencies and my selfie supplies the high
+      frequencies. Both images are aligned into the 675 × 900 selfie frame,
+      where my eyes are 200 px apart.
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>Component</th><th>σ</th><th>Cutoff f<sub>c</sub></th><th>Period 1/f<sub>c</sub></th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Einstein, low-pass</td><td>10 px</td><td>0.019 cycles/px</td><td>≈ 53 px</td></tr>
+        <tr><td>Selfie, high-pass</td><td>4 px</td><td>0.047 cycles/px</td><td>≈ 21 px</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      <strong>Why these cutoffs:</strong> The low-pass filter keeps only
+      structure larger than about a quarter of the eye spacing: Einstein's head
+      outline, the white mass of his hair, his eye sockets, and the dark
+      sweater. It removes his wrinkles and individual hairs. The high-pass
+      filter keeps only detail smaller than about 21 px: my eyelids, teeth,
+      hairline, and the edge of my face. Because the low-pass cutoff
+      (0.019 cycles/px) is well below the high-pass cutoff (0.047 cycles/px),
+      the band between them comes from neither image. That gap keeps the two faces from competing at middle
+      frequencies, which would otherwise make the result look like a
+      double exposure at every viewing distance.
+    </p>
+
+    <div class="images">
+      <figure>
+        <img src="assets/selfie-einstein-selfie-aligned.jpg" alt="Selfie, used as the alignment reference">
+        <figcaption>Selfie (reference frame)</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/selfie-einstein-einstein-aligned.jpg" alt="Einstein portrait aligned to the selfie by the eyes">
+        <figcaption>Aligned Einstein</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/selfie-einstein-einstein-low.jpg" alt="Low-frequency component of the Einstein portrait">
+        <figcaption>Einstein low frequencies, σ = 10</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/selfie-einstein-selfie-high.png" alt="High-frequency component of the selfie, shown with gray as zero">
+        <figcaption>Selfie high frequencies, σ = 4 (gray = 0)</figcaption>
+      </figure>
+      <figure class="wide">
+        <img src="assets/selfie-einstein-hybrid.jpg" alt="Hybrid image combining the selfie and Albert Einstein" style="max-width: 450px">
+        <figcaption>Selfie + Einstein hybrid</figcaption>
+      </figure>
+      <figure class="wide">
+        <img src="assets/selfie-einstein-scales.png" alt="The selfie and Einstein hybrid shown at full, half, quarter, and eighth size">
+        <figcaption>The same hybrid at 1, 1/2, 1/4, and 1/8 size. Shrinking it simulates stepping back: my face at full size, Einstein by 1/4.</figcaption>
+      </figure>
+    </div>
+
+    <h3>Frequency analysis</h3>
+    <p>
+      Each panel shows the log magnitude of the 2D Fourier transform,
+      log|FFT|, with the zero frequency at the center. Before each transform I
+      subtracted the image mean and multiplied by a Hann window. Without the
+      window, the jump at the image borders adds a bright horizontal and
+      vertical cross that hides the actual content. All five panels share one
+      brightness scale, so they can be compared directly.
+    </p>
+    <div class="images spectra">
+      <figure>
+        <img src="assets/fft-selfie.png" alt="Log Fourier magnitude of the aligned selfie">
+        <figcaption>Selfie</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/fft-einstein.png" alt="Log Fourier magnitude of the aligned Einstein portrait">
+        <figcaption>Einstein</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/fft-selfie-high.png" alt="Log Fourier magnitude of the high-pass selfie">
+        <figcaption>High-pass selfie</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/fft-einstein-low.png" alt="Log Fourier magnitude of the low-pass Einstein">
+        <figcaption>Low-pass Einstein</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/fft-hybrid.png" alt="Log Fourier magnitude of the hybrid image">
+        <figcaption>Hybrid</figcaption>
+      </figure>
+    </div>
+    <p>
+      The low-pass filter leaves only a small disk around the center: every
+      frequency above the cutoff is gone. The high-pass filter does the
+      opposite. It removes the bright center of the selfie's spectrum and
+      leaves the outer region unchanged. The hybrid's spectrum is the sum of
+      these two: Einstein's disk at the center, surrounded by the selfie's
+      high frequencies.
+    </p>
+
+    <h3>Choosing σ: comparison</h3>
+    <p>
+      To check the cutoffs, I changed one σ at a time from the chosen values
+      (σ<sub>low</sub> = 10, σ<sub>high</sub> = 4) and looked at each result
+      at several sizes.
+    </p>
+    <div class="images">
+      <figure class="wide">
+        <img src="assets/sweep-low5-high4.png" alt="Hybrid with low sigma 5 and high sigma 4 at four sizes">
+        <figcaption>σ<sub>low</sub> = 5: too much of Einstein survives. His features show through up close and compete with my face.</figcaption>
+      </figure>
+      <figure class="wide">
+        <img src="assets/sweep-low20-high4.png" alt="Hybrid with low sigma 20 and high sigma 4 at four sizes">
+        <figcaption>σ<sub>low</sub> = 20: Einstein is weaker at small sizes, and the large blur spreads a bright halo around my head.</figcaption>
+      </figure>
+      <figure class="wide">
+        <img src="assets/sweep-low10-high2.png" alt="Hybrid with low sigma 10 and high sigma 2 at four sizes">
+        <figcaption>σ<sub>high</sub> = 2: only the finest edges of my face remain, so the close-up is mostly Einstein.</figcaption>
+      </figure>
+      <figure class="wide">
+        <img src="assets/sweep-low10-high8.png" alt="Hybrid with low sigma 10 and high sigma 8 at four sizes">
+        <figcaption>σ<sub>high</sub> = 8: my face keeps enough mid-frequency shading that it is still visible at 1/4 size.</figcaption>
+      </figure>
+    </div>
+
+    <h3>Derek and Nutmeg</h3>
+    <p>
+      Nutmeg supplies the low frequencies (σ = 10, period ≈ 53 px) and Derek
+      supplies the high frequencies (σ = 4, period ≈ 21 px), in Derek's
+      732 × 1024 frame where his eyes are about 139 px apart.
+    </p>
+    <div class="images">
+      <figure>
+        <img src="assets/derek-nutmeg-derek-aligned.jpg" alt="Derek, used as the alignment reference">
+        <figcaption>Derek (high frequencies)</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/derek-nutmeg-nutmeg-aligned.jpg" alt="Nutmeg the cat aligned to Derek by the eyes">
+        <figcaption>Aligned Nutmeg (low frequencies)</figcaption>
+      </figure>
+      <figure class="wide">
+        <img src="assets/derek-nutmeg-scales.png" alt="The Derek and Nutmeg hybrid at full, half, quarter, and eighth size">
+        <figcaption>Derek + Nutmeg hybrid at 1, 1/2, 1/4, and 1/8 size</figcaption>
+      </figure>
+    </div>
+
+    <h3>Derek and Einstein</h3>
+    <p>
+      For this pair, Einstein supplies the high frequencies. His portrait has
+      a lot of fine texture (wrinkles, wild hair, a knit sweater), so up close
+      it overpowers the smooth studio lighting of Derek's photo. Derek supplies
+      the low frequencies, and his dark hair and shirt give a strong
+      silhouette that is easy to read from far away. Both faces are front-on,
+      so once the eyes are aligned the head outlines roughly line up. Derek is
+      aligned into Einstein's native 450 × 449 frame, where the eyes are 84 px
+      apart instead of 200 px, so smaller σ values are needed. After trying a
+      few values and checking each at several sizes, I used
+      σ<sub>low</sub> = 6 (period ≈ 32 px) and σ<sub>high</sub> = 2
+      (period ≈ 11 px).
+    </p>
+    <div class="images">
+      <figure>
+        <img src="assets/derek-einstein-einstein-aligned.jpg" alt="Einstein, used as the alignment reference">
+        <figcaption>Einstein (high frequencies)</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/derek-einstein-derek-aligned.jpg" alt="Derek aligned to Einstein by the eyes">
+        <figcaption>Aligned Derek (low frequencies)</figcaption>
+      </figure>
+      <figure class="wide">
+        <img src="assets/derek-einstein-scales.png" alt="The Derek and Einstein hybrid at full, half, quarter, and eighth size">
+        <figcaption>Derek + Einstein hybrid at 1, 1/2, 1/4, and 1/8 size: Einstein up close, Derek from afar</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      Image source:
+      <a href="https://commons.wikimedia.org/wiki/File:Albert_Einstein_1947_square_cropped.jpg">Albert Einstein portrait</a>
+      (public domain, Wikimedia Commons).
+    </p>
+
+    <h2>Part 2.3: Gaussian and Laplacian Stacks</h2>
+    <p>
+      A stack is like a pyramid, but without downsampling: every level keeps
+      the full image size. I built both stacks from scratch, with no built-in
+      pyramid functions.
+    </p>
+    <ul>
+      <li>
+        <strong>Gaussian stack:</strong> G<sub>0</sub> is the image, and
+        G<sub>i+1</sub> is G<sub>i</sub> blurred by a Gaussian with
+        σ = σ<sub>0</sub> · 2<sup>i</sup>. Doubling σ at each step roughly
+        doubles the total blur per level, which mimics halving the resolution
+        in a pyramid. For the 300 × 300 apple and orange, σ<sub>0</sub> = 2,
+        so the total blur at levels 1–5 is about 2, 4.5, 9.2, 18 and 37 px.
+      </li>
+      <li>
+        <strong>Laplacian stack:</strong> L<sub>i</sub> = G<sub>i</sub> −
+        G<sub>i+1</sub> for levels 0–4. Each band holds the detail that one
+        extra blur removes. The last level is the blurriest Gaussian,
+        L<sub>5</sub> = G<sub>5</sub>. The sum telescopes, so adding up all six
+        levels returns the original image exactly.
+      </li>
+    </ul>
+    <p>
+      In the Laplacian images, mid-gray means zero. Each band gets its own
+      contrast stretch, because the coarse bands are much stronger than the
+      fine ones. The stretch is applied per color channel, which is why some
+      coarse bands show false colors such as cyan and blue.
+    </p>
+    <h4>Apple</h4>
+    <div class="images six">
+      <figure>
+        <img src="assets/apple-gaussian-0.jpg" alt="Apple Gaussian stack level 0" loading="lazy">
+        <figcaption>G<sub>0</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-gaussian-1.jpg" alt="Apple Gaussian stack level 1" loading="lazy">
+        <figcaption>G<sub>1</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-gaussian-2.jpg" alt="Apple Gaussian stack level 2" loading="lazy">
+        <figcaption>G<sub>2</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-gaussian-3.jpg" alt="Apple Gaussian stack level 3" loading="lazy">
+        <figcaption>G<sub>3</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-gaussian-4.jpg" alt="Apple Gaussian stack level 4" loading="lazy">
+        <figcaption>G<sub>4</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-gaussian-5.jpg" alt="Apple Gaussian stack level 5" loading="lazy">
+        <figcaption>G<sub>5</sub></figcaption>
+      </figure>
+    </div>
+    <div class="images six">
+      <figure>
+        <img src="assets/apple-laplacian-0.jpg" alt="Apple Laplacian stack level 0" loading="lazy">
+        <figcaption>L<sub>0</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-laplacian-1.jpg" alt="Apple Laplacian stack level 1" loading="lazy">
+        <figcaption>L<sub>1</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-laplacian-2.jpg" alt="Apple Laplacian stack level 2" loading="lazy">
+        <figcaption>L<sub>2</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-laplacian-3.jpg" alt="Apple Laplacian stack level 3" loading="lazy">
+        <figcaption>L<sub>3</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-laplacian-4.jpg" alt="Apple Laplacian stack level 4" loading="lazy">
+        <figcaption>L<sub>4</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/apple-laplacian-5.jpg" alt="Apple Laplacian stack level 5" loading="lazy">
+        <figcaption>L<sub>5</sub> = G<sub>5</sub></figcaption>
+      </figure>
+    </div>
+    <h4>Orange</h4>
+    <div class="images six">
+      <figure>
+        <img src="assets/orange-gaussian-0.jpg" alt="Orange Gaussian stack level 0" loading="lazy">
+        <figcaption>G<sub>0</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-gaussian-1.jpg" alt="Orange Gaussian stack level 1" loading="lazy">
+        <figcaption>G<sub>1</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-gaussian-2.jpg" alt="Orange Gaussian stack level 2" loading="lazy">
+        <figcaption>G<sub>2</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-gaussian-3.jpg" alt="Orange Gaussian stack level 3" loading="lazy">
+        <figcaption>G<sub>3</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-gaussian-4.jpg" alt="Orange Gaussian stack level 4" loading="lazy">
+        <figcaption>G<sub>4</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-gaussian-5.jpg" alt="Orange Gaussian stack level 5" loading="lazy">
+        <figcaption>G<sub>5</sub></figcaption>
+      </figure>
+    </div>
+    <div class="images six">
+      <figure>
+        <img src="assets/orange-laplacian-0.jpg" alt="Orange Laplacian stack level 0" loading="lazy">
+        <figcaption>L<sub>0</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-laplacian-1.jpg" alt="Orange Laplacian stack level 1" loading="lazy">
+        <figcaption>L<sub>1</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-laplacian-2.jpg" alt="Orange Laplacian stack level 2" loading="lazy">
+        <figcaption>L<sub>2</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-laplacian-3.jpg" alt="Orange Laplacian stack level 3" loading="lazy">
+        <figcaption>L<sub>3</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-laplacian-4.jpg" alt="Orange Laplacian stack level 4" loading="lazy">
+        <figcaption>L<sub>4</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/orange-laplacian-5.jpg" alt="Orange Laplacian stack level 5" loading="lazy">
+        <figcaption>L<sub>5</sub> = G<sub>5</sub></figcaption>
+      </figure>
+    </div>
+
+    <h3>Recreating Szeliski Figure 3.42</h3>
+    <p>
+      Szeliski's figure shows the apple + orange blend broken down by level.
+      The first three rows show Laplacian levels 0, 2 and 4: the apple's band
+      weighted by the blurred mask, the orange's band weighted by one minus the
+      mask, and their sum. The last row adds up all levels of each column. The
+      fine levels (row 1) switch from apple to orange across a sharp seam. The
+      coarse levels (row 3) switch across a wide, gradual seam. The three
+      panels in each row share one contrast stretch, so the two masked bands
+      and their sum can be compared directly.
+    </p>
+    <div class="images three">
+      <figure>
+        <img src="assets/oraple-level0-a.jpg" alt="Level 0 band of the masked apple" loading="lazy">
+        <figcaption>Level 0: masked apple</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level0-b.jpg" alt="Level 0 band of the masked orange" loading="lazy">
+        <figcaption>Level 0: masked orange</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level0-blend.jpg" alt="Level 0 band of the blend" loading="lazy">
+        <figcaption>Level 0: blended</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level2-a.jpg" alt="Level 2 band of the masked apple" loading="lazy">
+        <figcaption>Level 2: masked apple</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level2-b.jpg" alt="Level 2 band of the masked orange" loading="lazy">
+        <figcaption>Level 2: masked orange</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level2-blend.jpg" alt="Level 2 band of the blend" loading="lazy">
+        <figcaption>Level 2: blended</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level4-a.jpg" alt="Level 4 band of the masked apple" loading="lazy">
+        <figcaption>Level 4: masked apple</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level4-b.jpg" alt="Level 4 band of the masked orange" loading="lazy">
+        <figcaption>Level 4: masked orange</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-level4-blend.jpg" alt="Level 4 band of the blend" loading="lazy">
+        <figcaption>Level 4: blended</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-reconstruction-a.jpg" alt="Masked apple summed over all levels" loading="lazy">
+        <figcaption>All levels: masked apple</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-reconstruction-b.jpg" alt="Masked orange summed over all levels" loading="lazy">
+        <figcaption>All levels: masked orange</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-reconstruction-blend.jpg" alt="Final blended image" loading="lazy">
+        <figcaption>All levels: blended</figcaption>
+      </figure>
+    </div>
+
+    <h2>Part 2.4: Multiresolution Blending</h2>
+    <p>
+      Following Burt and Adelson (1983), I blend two images one frequency band
+      at a time. I build Laplacian stacks L<sup>A</sup> and L<sup>B</sup> for
+      the two images and a Gaussian stack G<sup>M</sup> for the mask, which is
+      1 where image A should appear. Each blended band is
+      L<sub>i</sub> = G<sup>M</sup><sub>i</sub> · L<sup>A</sup><sub>i</sub> +
+      (1 − G<sup>M</sup><sub>i</sub>) · L<sup>B</sup><sub>i</sub>, and the
+      result is the sum of all blended bands. Blending is done separately in
+      each color channel.
+    </p>
+    <p>
+      Fine details blend across a narrow seam, so textures don't overlap into
+      ghosts. Overall color and brightness blend across a wide seam, so there's
+      no sudden jump. A single blurred mask can only do one of these: sharp
+      enough to avoid ghosting leaves a visible color step, and soft enough to
+      hide the step makes the textures overlap.
+    </p>
+
+    <h3>Apple + orange (the "oraple")</h3>
+    <p>
+      The mask is a vertical step: 1 on the left half (apple) and 0 on the
+      right (orange). Below are the result, the mask, and the mask's Gaussian
+      stack, which is the weight used at each level.
+    </p>
+    <div class="images ">
+      <figure>
+        <img src="assets/oraple.jpg" alt="Blended apple and orange" loading="lazy">
+        <figcaption>Oraple: 6 levels, σ<sub>0</sub> = 2</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-mask.png" alt="Vertical step mask: white on the left half" loading="lazy">
+        <figcaption>Step mask (white = apple)</figcaption>
+      </figure>
+    </div>
+    <div class="images six">
+      <figure>
+        <img src="assets/oraple-mask-0.png" alt="Mask Gaussian stack level 0" loading="lazy">
+        <figcaption>G<sup>M</sup><sub>0</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-mask-1.png" alt="Mask Gaussian stack level 1" loading="lazy">
+        <figcaption>G<sup>M</sup><sub>1</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-mask-2.png" alt="Mask Gaussian stack level 2" loading="lazy">
+        <figcaption>G<sup>M</sup><sub>2</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-mask-3.png" alt="Mask Gaussian stack level 3" loading="lazy">
+        <figcaption>G<sup>M</sup><sub>3</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-mask-4.png" alt="Mask Gaussian stack level 4" loading="lazy">
+        <figcaption>G<sup>M</sup><sub>4</sub></figcaption>
+      </figure>
+      <figure>
+        <img src="assets/oraple-mask-5.png" alt="Mask Gaussian stack level 5" loading="lazy">
+        <figcaption>G<sup>M</sup><sub>5</sub></figcaption>
+      </figure>
+    </div>
+
+    <h3>Half pizza, half cookie</h3>
+    <p>
+      Both photos are taken from directly above. I marked the center and
+      radius of the pizza and the cookie by hand. A similarity transform then
+      maps both rims onto the same circle (radius 360 px, centered in a
+      750 × 750 canvas). The mask is a vertical step: pizza on the left, cookie
+      on the right. Placing the pizza on the left also hides the slice that is
+      missing from its right side. Because the canvas is larger than the 300 px
+      oraple, I doubled σ<sub>0</sub> to 4 so the coarsest seam is
+      proportionally as wide.
+    </p>
+    <div class="images three">
+      <figure>
+        <img src="assets/pizza-aligned.jpg" alt="Pizza aligned to the shared circle" loading="lazy">
+        <figcaption>Aligned pizza</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cookie-aligned.jpg" alt="Cookie aligned to the shared circle" loading="lazy">
+        <figcaption>Aligned cookie</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/pizza-cookie-mask.png" alt="Vertical step mask: white on the left half" loading="lazy">
+        <figcaption>Mask (white = pizza)</figcaption>
+      </figure>
+    </div>
+    <div class="images ">
+      <figure class="wide">
+        <img src="assets/pizza-cookie.jpg" alt="Blended image: pizza on the left, cookie on the right" loading="lazy">
+        <figcaption>Pizza + cookie: 6 levels, σ<sub>0</sub> = 4</figcaption>
+      </figure>
+    </div>
+
+    <h3>Favorite: the Earth as an iris (irregular mask)</h3>
+    <p>
+      I replaced the iris of a close-up eye photo with the Earth seen from
+      space. The Earth's disk is scaled and shifted so its edge lands exactly
+      on the iris edge (center (640, 435), radius 358 px). The mask is the iris
+      circle, shrunk by 6 px, intersected with the eye opening. I traced the
+      upper and lower eyelid margins by hand as polygons, so the Earth is tucked
+      under both lids instead of being cut by a straight line.
+    </p>
+    <p>
+      Multiresolution blending does two useful things here. At the fine
+      levels, the seam is sharp, so cloud and coastline detail stops cleanly at
+      the iris edge. At the coarse levels, the Earth's dark limb and the black
+      space around it spread a soft shadow just outside the iris. That shadow
+      looks like the darker ring a real iris has at its edge.
+    </p>
+    <div class="images three">
+      <figure>
+        <img src="assets/eye.jpg" alt="Close-up of an eye" loading="lazy">
+        <figcaption>Eye (image B)</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-aligned.jpg" alt="Earth aligned to the iris" loading="lazy">
+        <figcaption>Aligned Earth (image A)</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-mask.png" alt="Irregular mask: the iris circle clipped by the eyelids" loading="lazy">
+        <figcaption>Irregular mask (white = Earth)</figcaption>
+      </figure>
+    </div>
+    <div class="images ">
+      <figure class="wide">
+        <img src="assets/earth-eye.jpg" alt="Blended image: the Earth as the iris of an eye" loading="lazy">
+        <figcaption>Earth + eye: 6 levels, σ<sub>0</sub> = 3</figcaption>
+      </figure>
+    </div>
+
+    <h4>The blending process</h4>
+    <p>
+      The same layout as the Figure 3.42 recreation, applied to this blend.
+      Rows 1–3 are Laplacian levels 0, 2 and 4 of the masked Earth, the masked
+      eye, and their sum. The last row adds up all levels. Notice how much
+      wider the masked region's soft edge becomes at level 4.
+    </p>
+    <div class="images three">
+      <figure>
+        <img src="assets/earth-eye-level0-a.jpg" alt="Level 0 band of the masked Earth" loading="lazy">
+        <figcaption>Level 0: masked Earth</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level0-b.jpg" alt="Level 0 band of the masked eye" loading="lazy">
+        <figcaption>Level 0: masked eye</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level0-blend.jpg" alt="Level 0 band of the blend" loading="lazy">
+        <figcaption>Level 0: blended</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level2-a.jpg" alt="Level 2 band of the masked Earth" loading="lazy">
+        <figcaption>Level 2: masked Earth</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level2-b.jpg" alt="Level 2 band of the masked eye" loading="lazy">
+        <figcaption>Level 2: masked eye</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level2-blend.jpg" alt="Level 2 band of the blend" loading="lazy">
+        <figcaption>Level 2: blended</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level4-a.jpg" alt="Level 4 band of the masked Earth" loading="lazy">
+        <figcaption>Level 4: masked Earth</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level4-b.jpg" alt="Level 4 band of the masked eye" loading="lazy">
+        <figcaption>Level 4: masked eye</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-level4-blend.jpg" alt="Level 4 band of the blend" loading="lazy">
+        <figcaption>Level 4: blended</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-reconstruction-a.jpg" alt="Masked Earth summed over all levels" loading="lazy">
+        <figcaption>All levels: masked Earth</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-reconstruction-b.jpg" alt="Masked eye summed over all levels" loading="lazy">
+        <figcaption>All levels: masked eye</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/earth-eye-reconstruction-blend.jpg" alt="Final blended image" loading="lazy">
+        <figcaption>All levels: blended</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      Image sources (Wikimedia Commons):
+      <a href="https://commons.wikimedia.org/wiki/File:Blaze_Pizza_1.jpg">pizza</a> (CC0),
+      <a href="https://commons.wikimedia.org/wiki/File:2024-10-17_14_19_03_The_top_of_a_Freihofer%27s_chocolate_chip_cookie_in_Sand_Lake,_Rensselaer_County,_New_York.jpg">cookie</a> (CC BY-SA 4.0),
+      <a href="https://commons.wikimedia.org/wiki/File:Eye_closeup_greebrown.jpg">eye</a> (CC BY-SA 3.0), and
+      <a href="https://commons.wikimedia.org/wiki/File:Earth_Eastern_Hemisphere.jpg">Earth</a> (public domain, NASA).
+      The apple and orange images come from the course's sample images.
+    </p>
+
+    <h2>Reflection</h2>
+    <p>
+      The most important thing I learned is to think of an image as a sum of
+      frequency bands, and that most of this project is just deciding what to
+      do with each band. A Gaussian blur keeps the low frequencies, and the
+      image minus its blur keeps the high ones. Every part builds on that one
+      split. Sharpening boosts the high band and adds it back. A hybrid image
+      takes the low band of one picture and the high band of another. A
+      Laplacian stack cuts an image into several bands, and multiresolution
+      blending mixes each band across a seam whose width matches that band.
+    </p>
+    <p>
+      The hybrid images taught me that the cutoffs matter more than the
+      method. Leaving a gap between the low-pass and high-pass cutoffs is what
+      keeps the two faces from fighting at every viewing distance. Blending
+      showed the same idea from the other side: one blurred mask cannot be
+      both sharp enough to keep textures from ghosting and soft enough to hide
+      color changes, but a different mask width for each band can be both.
+    </p>
+  </main>
+</body>
+</html>
