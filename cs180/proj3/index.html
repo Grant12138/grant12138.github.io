@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CS180 Project 3 by Grant Luo: pretrained flow-model experiments and U-Nets trained from scratch on MNIST, with denoising, flow matching, and classifier-free guidance.">
+  <meta name="theme-color" content="#f7f6f2">
+  <title>Fun with Flow Models · Grant Luo · CS180</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to results</a>
+  <main id="main">
+    <section class="hero" id="overview" aria-labelledby="project-title">
+      <div class="hero-copy">
+        <div class="hero-identity" aria-label="Course and project details">
+          <p class="hero-course"><span class="course-code">CS180</span><span>Intro to Computer Vision and Computational Photography</span></p>
+          <p class="hero-context">UC Berkeley <span aria-hidden="true">·</span> Fall 2026</p>
+          <p class="hero-byline"><span>Project 3</span><span aria-hidden="true">/</span><span>Grant Luo</span></p>
+        </div>
+        <h1 id="project-title">Fun with<br><em>flow models.</em></h1>
+        <p class="hero-deck">From pretrained image editing to flow matching from scratch.</p>
+        <p class="hero-description">Part A explores denoising, generation, and image editing with PixNerd. Part B builds on these ideas by training U-Nets to generate handwritten digits.</p>
+        <nav class="hero-actions" aria-label="Project parts">
+          <a class="primary-link" href="#part-a">Part A <span aria-hidden="true">↘</span></a>
+          <a class="primary-link" href="#part-b">Part B <span aria-hidden="true">↘</span></a>
+        </nav>
+      </div>
+      <div class="hero-gallery" aria-label="A selection of experimental results">
+        <figure class="hero-primary"><a href="#text-editing"><img src="assets/results/astronaut_preview.webp" width="361" height="360" alt="Statue of Liberty reimagined as an astronaut, standing on a pedestal with a moon behind it" fetchpriority="high"></a><figcaption><span>01 / REIMAGINE</span>Liberty → astronaut</figcaption></figure>
+        <figure><a href="#anagrams"><img src="assets/results/anagram_wizard_castle_upright.webp" width="374" height="374" alt="A bearded wizard whose inverted image becomes a castle"></a><figcaption><span>02 / ROTATE</span>Wizard ↔ castle</figcaption></figure>
+        <figure><a href="#hybrids"><img src="assets/results/hybrid_eye_ocean.png" width="512" height="512" alt="Sailing ships and waves form the broad shape of a human eye"></a><figcaption><span>03 / LOOK CLOSER</span>Eye + ocean</figcaption></figure>
+      </div>
+    </section>
+
+    <div class="project-layout" id="part-a">
+      <aside class="contents">
+        <p class="eyebrow">PROJECT / FIELD NOTES</p>
+        <nav aria-label="Experiment index">
+          <a href="#setup">The setup</a>
+          <span class="nav-group">01 · Denoising & sampling</span>
+          <a href="#noisy-inputs"><span>1.1</span>Noisy inputs</a>
+          <a href="#classical"><span>1.2</span>Classical denoising</a>
+          <a href="#one-step"><span>1.3</span>One-step denoising</a>
+          <a href="#velocity"><span>1.4</span>Visualizing velocity</a>
+          <a href="#euler"><span>1.5</span>Euler sampling</a>
+          <a href="#generation"><span>1.6</span>From pure noise</a>
+          <span class="nav-group">02 · Guidance</span>
+          <a href="#cfg"><span>2.1</span>Classifier-free guidance</a>
+          <span class="nav-group">03 · Creative applications</span>
+          <a href="#editing"><span>3.1</span>Image-to-image editing</a>
+          <a href="#drawings"><span>↳</span>Web images & drawings</a>
+          <a href="#text-editing"><span>3.2</span>Text-guided editing</a>
+          <a href="#anagrams"><span>3.3</span>Visual anagrams</a>
+          <a href="#hybrids"><span>3.4</span>Hybrid images</a>
+          <span class="nav-group part-b-label">Part B · From scratch</span>
+          <a href="#part-b">MNIST & setup</a>
+          <a href="#b-noising"><span>1.2</span>Noising process</a>
+          <a href="#b-denoising"><span>1.2.1</span>Single-step denoising</a>
+          <a href="#b-ood"><span>1.2.2</span>Unseen noise levels</a>
+          <a href="#b-pure-noise"><span>1.2.3</span>Pure-noise experiment</a>
+          <a href="#b-time"><span>2.1–3</span>Time-conditioned flow</a>
+          <a href="#b-class"><span>2.4–6</span>Class-conditioned flow</a>
+          <a href="#b-no-scheduler">Without a scheduler</a>
+        </nav>
+      </aside>
+
+      <div class="report">
+        <section class="report-section setup" id="setup">
+          <h2>Part A: Exploring a pretrained flow model</h2>
+          <p>I used <strong>PixNerd-XXL-P16-T2I</strong> to denoise images, generate new ones, and make edits with text prompts. No additional training was needed. These experiments follow the linear path below, where x<sub>1</sub> is a clean image and ε is Gaussian noise.</p>
+          <div class="parameter-strip" aria-label="Experimental settings"><div><span>RESOLUTION</span><strong>512 × 512</strong></div><div><span>EULER STEP</span><strong>h = 0.02</strong></div><div><span>GUIDANCE</span><strong>w = 7</strong></div><div><span>BASE SEED</span><strong>180</strong></div></div>
+          <div class="equation"><span class="equation-label">THE LINEAR PATH</span><span>x<sub>t</sub> = (1 − t) ε + t x<sub>1</sub></span><small>t = 0: Gaussian noise &nbsp;→&nbsp; t = 1: clean image</small></div>
+          <p>Source images are center-cropped, resized, and normalized to [−1, 1]. I reuse the same noise at t = 0.25, 0.50, and 0.75 for the initial denoising comparisons. The model also receives a text embedding c; an empty prompt supplies the unconditional prediction used later for guidance.</p>
+          <p class="source-note">Project brief: <a href="https://cal-cs180.github.io/fa26/hw/proj3-flow/parta.html">CS180 Part A handout ↗</a>.</p>
+        </section>
+
+        <div class="chapter-heading"><span>01</span><div><p class="eyebrow">FOLLOWING THE VELOCITY FIELD</p><h2>Denoising & sampling</h2></div></div>
+        <section class="report-section" id="noisy-inputs">
+          <div class="section-heading"><span>1.1</span><h3>Constructing noisy training inputs</h3></div>
+          <p>I first mixed the Statue of Liberty with noise along this path. At t = 0.25, noise dominates; as t increases, the statue’s outline and details emerge. Holding the noise fixed isolates the effect of time and gives us comparable inputs for the denoising methods below.</p>
+          <figure class="panel"><a class="zoom" href="assets/results/training_inputs.png"><img src="assets/results/training_inputs.png" width="1593" height="411" loading="lazy" alt="Original Statue of Liberty and noisy training inputs at t = 0.25, 0.50, and 0.75"></a><figcaption>Original, then t = 0.25, 0.50, 0.75. All three inputs share the same Gaussian noise (seed 180).</figcaption></figure>
+        </section>
+
+        <section class="report-section" id="classical">
+          <div class="section-heading"><span>1.2</span><h3>Classical denoising</h3></div>
+          <p>As a baseline, I divided each noisy input by t to restore the clean image’s amplitude, then applied Gaussian blur. I tested σ = 1, 2, 4, 8, and 16 and kept the result with the lowest mean squared error (MSE) against the original. This gives blur an advantage: the clean reference would usually be unavailable when choosing its strength.</p>
+          <div class="figure-stack compact">
+            <figure class="panel"><div class="figure-label">t = 0.25</div><a class="zoom" href="assets/results/blur_025.png"><img src="assets/results/blur_025.png" width="793" height="411" loading="lazy" alt="At t = 0.25, the noisy input beside the best Gaussian blur result"></a><figcaption>Heavy corruption requires strong smoothing; the silhouette remains, but fine details disappear.</figcaption></figure>
+            <figure class="panel"><div class="figure-label">t = 0.50</div><a class="zoom" href="assets/results/blur_050.png"><img src="assets/results/blur_050.png" width="793" height="411" loading="lazy" alt="At t = 0.50, the noisy input beside the selected Gaussian blur result"></a><figcaption>More structure survives, although the crown, face, and folds remain soft.</figcaption></figure>
+            <figure class="panel"><div class="figure-label">t = 0.75</div><a class="zoom" href="assets/results/blur_075.png"><img src="assets/results/blur_075.png" width="793" height="411" loading="lazy" alt="At t = 0.75, the noisy input beside the selected Gaussian blur result"></a><figcaption>Less initial noise gives the best balance between smoothing and preserving detail.</figcaption></figure>
+          </div>
+          <p class="observation"><span>OBSERVATION</span>Blur suppresses noise but also removes meaningful edges. Even the selected results soften the crown, face, and robe, motivating a denoiser that can use learned image structure.</p>
+        </section>
+
+        <section class="report-section" id="one-step">
+          <div class="section-heading"><span>1.3</span><h3>One-step denoising</h3></div>
+          <p>Next, I used the prompt <q>a high quality photo</q> to predict a velocity field: the image’s rate of change at the current time. Multiplying this prediction by the remaining time, 1 − t, gives a one-step estimate of the clean image. Earlier starting times require a longer extrapolation from less reliable image information.</p>
+          <div class="equation"><span>x̂<sub>1</sub> = x<sub>t</sub> + (1 − t) v<sub>θ</sub>(x<sub>t</sub>, t, c)</span></div>
+          <div class="figure-stack">
+            <figure class="panel"><div class="figure-label">t = 0.25</div><a class="zoom" href="assets/results/one_step_025.png"><img src="assets/results/one_step_025.png" width="1193" height="411" loading="lazy" alt="Original, t = 0.25 noisy input, and one-step estimate"></a><figcaption>At t = 0.25, a single long extrapolation has little reliable source information.</figcaption></figure>
+            <figure class="panel"><div class="figure-label">t = 0.50</div><a class="zoom" href="assets/results/one_step_050.png"><img src="assets/results/one_step_050.png" width="1193" height="411" loading="lazy" alt="Original, t = 0.50 noisy input, and one-step estimate"></a><figcaption>The middle starting time recovers the recognizable statue and pedestal.</figcaption></figure>
+            <figure class="panel"><div class="figure-label">t = 0.75</div><a class="zoom" href="assets/results/one_step_075.png"><img src="assets/results/one_step_075.png" width="1193" height="411" loading="lazy" alt="Original, t = 0.75 noisy input, and one-step estimate"></a><figcaption>At t = 0.75, more of the original survives and the remaining extrapolation is shorter.</figcaption></figure>
+          </div>
+        </section>
+
+        <section class="report-section" id="velocity">
+          <div class="section-heading"><span>1.4</span><h3>Visualizing velocity</h3></div>
+          <p>To examine these predictions, I compared the model’s update, (1 − t)v<sub>θ</sub>, with the true update, (1 − t)(x<sub>1</sub> − ε). Both use the same remaining time. Their RGB root-mean-square difference at each pixel produces the error map below, showing where the predicted update differs from the one needed to recover this photograph.</p>
+          <div class="equation"><span>E<sub>t</sub> = √mean<sub>RGB</sub>[(predicted update − ground-truth update)²]</span></div>
+          <figure class="original-inline"><a class="zoom" href="assets/results/velocity_original.png"><img src="assets/results/velocity_original.png" width="512" height="512" loading="lazy" alt="The clean 512 by 512 Statue of Liberty used to compute the ground-truth update"></a><figcaption>The clean reference, shown once for this diagnostic.</figcaption></figure>
+          <div class="figure-stack">
+            <figure class="panel"><div class="figure-label">t = 0.25</div><a class="zoom" href="assets/results/velocity_025.png"><img src="assets/results/velocity_025.png" width="1558" height="411" loading="lazy" alt="At t = 0.25: noisy image, predicted update, ground-truth update, and RGB RMS error heatmap"></a><figcaption>Left to right: input, predicted update, ground-truth update, RGB RMS error.</figcaption></figure>
+            <figure class="panel"><div class="figure-label">t = 0.50</div><a class="zoom" href="assets/results/velocity_050.png"><img src="assets/results/velocity_050.png" width="1558" height="411" loading="lazy" alt="At t = 0.50: noisy image, predicted update, ground-truth update, and RGB RMS error heatmap"></a><figcaption>Left to right: input, predicted update, ground-truth update, RGB RMS error.</figcaption></figure>
+            <figure class="panel"><div class="figure-label">t = 0.75</div><a class="zoom" href="assets/results/velocity_075.png"><img src="assets/results/velocity_075.png" width="1558" height="411" loading="lazy" alt="At t = 0.75: noisy image, predicted update, ground-truth update, and RGB RMS error heatmap"></a><figcaption>Left to right: input, predicted update, ground-truth update, RGB RMS error.</figcaption></figure>
+          </div>
+          <p class="observation"><span>READING THE MAPS</span>Updates share a symmetric display scale, with zero shown as gray. Heatmaps also share a scale: purple indicates smaller errors, and green/yellow larger ones. The prominent outline at t = 0.25 shows difficulty recovering the statue’s edges under heavy noise.</p>
+        </section>
+
+        <section class="report-section" id="euler">
+          <div class="section-heading"><span>1.5</span><h3>Iterative denoising with Euler sampling</h3></div>
+          <p>A one-step estimate holds the initial velocity fixed. Euler sampling instead predicts a new velocity after each small update, allowing the direction to change along the path. Starting from t = 0.50 with h = 0.02 takes 25 updates to reach t = 1; the trajectory below shows the image every fifth update.</p>
+          <div class="equation"><span>x<sub>t+h</sub> = x<sub>t</sub> + h v<sub>θ</sub>(x<sub>t</sub>, t, c)</span></div>
+          <figure class="panel"><a class="zoom" href="assets/results/euler_trajectory.png"><img src="assets/results/euler_trajectory.png" width="1193" height="811" loading="lazy" alt="Euler denoising trajectory at times 0.50, 0.60, 0.70, 0.80, 0.90, and 1.00"></a><figcaption>t = 0.50 → 0.60 → 0.70 → 0.80 → 0.90 → 1.00. Noise gradually disappears as the statue resolves.</figcaption></figure>
+          <h4>Same input, three denoising methods</h4>
+          <figure class="panel"><a class="zoom" href="assets/results/denoising_comparison.png"><img src="assets/results/denoising_comparison.png" width="1593" height="411" loading="lazy" alt="Original Statue of Liberty compared with Gaussian blur, one-step denoising, and iterative Euler denoising from the same t = 0.50 input"></a><figcaption>Original / Gaussian blur / one-step estimate / Euler result, all compared at t = 0.50.</figcaption></figure>
+          <div class="table-wrap"><table><caption>Reconstruction MSE recorded in the notebook (normalized image values)</caption><thead><tr><th scope="col">Method</th><th scope="col">MSE ↓</th></tr></thead><tbody><tr><td>Gaussian blur</td><td>0.011602</td></tr><tr class="best"><td>One-step denoising</td><td>0.003123</td></tr><tr><td>Euler denoising</td><td>0.003702</td></tr></tbody></table></div>
+          <p class="observation"><span>OBSERVATION</span>Both learned methods preserve more structure than blur, but the one-step estimate has slightly lower MSE than Euler sampling in this run. More updates can produce a plausible image without improving its pixel-wise match to the original.</p>
+          <p class="source-note">Constant-velocity tests verified the sampler’s total displacement, including a shortened final step when needed to reach t = 1.</p>
+        </section>
+
+        <section class="report-section" id="generation">
+          <div class="section-heading"><span>1.6</span><h3>Generating images from pure noise</h3></div>
+          <p>Starting at t = 0 removes the source photograph, so generation depends on the initial noise and text prompt. I generated five samples with <q>a high quality photo</q>, using different seeds and 50 Euler steps each.</p>
+          <figure class="panel"><a class="zoom" href="assets/results/conditional_samples.png"><img src="assets/results/conditional_samples.png" width="1602" height="811" loading="lazy" alt="Five ordinary conditional samples for a high quality photo, seeds 180, 185, 190, 195, and 200"></a><figcaption>Seeds 180, 185, 190, 195, 200 · h = 0.02 · ordinary conditional sampling.</figcaption></figure>
+          <p class="observation"><span>OBSERVATION</span>All five samples are portraits despite the generic prompt. Seeds 180 and 190 have noticeable facial distortions, which the guidance experiment below attempts to reduce.</p>
+        </section>
+
+        <div class="chapter-heading"><span>02</span><div><p class="eyebrow">TURNING UP THE TEXT CONDITION</p><h2>Conditional generation & guidance</h2></div></div>
+        <section class="report-section" id="cfg">
+          <div class="section-heading"><span>2.1</span><h3>Classifier-free guidance</h3></div>
+          <p>Classifier-free guidance (CFG) strengthens the prompt’s influence by combining a conditional prediction v<sub>c</sub> with an empty-prompt prediction v<sub>u</sub>. Both see the same image and time. Using Part A’s convention, I add w = 7 times their difference to v<sub>c</sub>, then repeat the previous experiment with the same seeds and prompt.</p>
+          <div class="equation"><span>v<sub>CFG</sub> = v<sub>c</sub> + w (v<sub>c</sub> − v<sub>u</sub>)</span><small>Project convention: w = 0 is ordinary conditional sampling; w = 7 gives 8v<sub>c</sub> − 7v<sub>u</sub>.</small></div>
+          <figure class="panel"><a class="zoom" href="assets/results/cfg_samples.png"><img src="assets/results/cfg_samples.png" width="1602" height="811" loading="lazy" alt="Five classifier-free guided portrait samples with seeds 180, 185, 190, 195, and 200, guidance weight 7"></a><figcaption>The same five initial noises and prompt as Section 1.6 · w = 7 · h = 0.02.</figcaption></figure>
+          <p class="observation"><span>OBSERVATION</span>The guided faces have more coherent features and smoother lighting. Their portrait compositions also become more similar, suggesting a tradeoff between visual consistency and variety in these five samples.</p>
+        </section>
+
+        <div class="chapter-heading"><span>03</span><div><p class="eyebrow">USING THE GENERATOR AS A CREATIVE TOOL</p><h2>Creative applications</h2></div></div>
+        <section class="report-section" id="editing">
+          <div class="section-heading"><span>3.1</span><h3>Image-to-image editing</h3></div>
+          <p>The same guided sampler can edit an existing photograph. I mixed each landmark with noise at seven starting times, then sampled to t = 1 using <q>a high quality photo</q>. Lower starting times erase more source information and allow larger changes; higher times preserve more of the landmark’s structure.</p>
+          <div class="time-guide"><span>MORE REINTERPRETATION</span><div>0.02 · 0.04 · 0.06 · 0.10 · 0.14 · 0.25 · 0.50</div><span>MORE PRESERVATION</span></div>
+          <p class="source-note">Every sweep below shows the original and all seven starting times. Noise seed 180, w = 7, h = 0.02.</p>
+          <h4>Campanile</h4>
+          <figure class="panel"><a class="zoom" href="assets/results/edit_campanile.png"><img src="assets/results/edit_campanile.png" width="1593" height="811" loading="lazy" alt="Campanile original and seven generic-prompt edits at starting times 0.02 through 0.50"></a><figcaption>The pale vertical mass survives at low t, while the belfry, clock, and masonry reappear at higher t.</figcaption></figure>
+          <h4>Statue of Liberty</h4>
+          <figure class="panel"><a class="zoom" href="assets/results/edit_statue.png"><img src="assets/results/edit_statue.png" width="1593" height="811" loading="lazy" alt="Statue of Liberty original and seven generic-prompt edits at starting times 0.02 through 0.50"></a><figcaption>The same sweep on the Statue of Liberty: progressively more of the pose, crown, and pedestal is retained.</figcaption></figure>
+          <h4>Eiffel Tower</h4>
+          <figure class="panel"><a class="zoom" href="assets/results/edit_eiffel.png"><img src="assets/results/edit_eiffel.png" width="1593" height="811" loading="lazy" alt="Eiffel Tower original and seven generic-prompt edits at starting times 0.02 through 0.50"></a><figcaption>At 0.02, the result is an unrelated portrait. By 0.14, the model recovers the tower’s lattice and tapering silhouette.</figcaption></figure>
+        </section>
+
+        <section class="report-section" id="drawings">
+          <div class="section-heading"><span>3.1 ↳</span><h3>Editing web images & hand-drawn inputs</h3></div>
+          <p>I repeated this procedure on a footage picture from the series <em>Bleach: Thousand-Year Blood War</em> and two drawings by my sister, whom I thank for letting me use her drawings for this project. Keeping the generic photo prompt tests whether denoising can make an illustration look photographic without explicitly describing its subject.</p>
+          <h4>Web image · Bleach</h4>
+          <figure class="panel"><a class="zoom" href="assets/results/edit_web.png"><img src="assets/results/edit_web.png" width="1593" height="811" loading="lazy" alt="A Bleach web image with a bright circular form, followed by seven image-to-image edits"></a><figcaption>At intermediate times, the circular form becomes a round object held by a person. At 0.25–0.50, the original scene returns more clearly.</figcaption></figure>
+          <h4>My sister’s first drawing</h4>
+          <figure class="panel"><a class="zoom" href="assets/results/edit_drawing_1.png"><img src="assets/results/edit_drawing_1.png" width="1593" height="811" loading="lazy" alt="The first drawing, a figure in a vest holding a glass, with all seven edits"></a><figcaption>At 0.10–0.14, the figure becomes more photographic while retaining parts of the outfit and pose. At 0.50, the illustrated source dominates.</figcaption></figure>
+          <h4>My sister’s second drawing</h4>
+          <figure class="panel"><a class="zoom" href="assets/results/edit_drawing_2.png"><img src="assets/results/edit_drawing_2.png" width="1593" height="811" loading="lazy" alt="The second drawing, a musician wearing a hat and ruffled outfit, with all seven edits"></a><figcaption>Low times produce unrelated people or objects. At 0.25–0.50, the hat, ruffles, and instrument return, along with the original painted style.</figcaption></figure>
+          <p class="observation"><span>OBSERVATION</span>Intermediate starting times introduce photographic textures while retaining parts of the pose and clothing. Lower times often replace the subject entirely; higher times preserve both the character and its illustrated style.</p>
+        </section>
+
+        <section class="report-section" id="text-editing">
+          <div class="section-heading"><span>3.2</span><h3>Text-guided image editing</h3></div>
+          <p>The generic prompt leaves the reinterpretation open-ended. To direct it, I kept the source images and sampling settings fixed and changed only the prompts. Each requested subject shares a visual feature with its source: the Campanile’s height, Liberty’s pose, or the Eiffel Tower’s steel framework.</p>
+          <h4>Campanile → lighthouse</h4>
+          <blockquote class="prompt"><span>Prompt</span>a high quality photo of a tall lighthouse on a rocky coast during a storm, its beacon shining through fog</blockquote>
+          <figure class="panel"><a class="zoom" href="assets/results/text_edit_campanile.png"><img src="assets/results/text_edit_campanile.png" width="1580" height="811" loading="lazy" alt="Campanile reimagined as a lighthouse at seven starting times, with the exact prompt shown above"></a><figcaption>Low times produce a lighthouse and rocky coast. At 0.04–0.14, the new lighthouse keeps the source’s tall, centered framing. At 0.50, the Campanile largely wins.</figcaption></figure>
+          <h4>Statue of Liberty → astronaut</h4>
+          <blockquote class="prompt"><span>Prompt</span>a cinematic photo of a colossal astronaut holding a glowing moon overhead, standing on a futuristic pedestal</blockquote>
+          <figure class="panel"><a class="zoom" href="assets/results/text_edit_statue.png"><img src="assets/results/text_edit_statue.png" width="1580" height="811" loading="lazy" alt="Statue of Liberty reimagined as a colossal astronaut holding a glowing moon at seven starting times"></a><figcaption>At 0.04–0.06, the torch becomes a glowing moon. At 0.10–0.25, the raised-arm pose survives as the statue becomes a spacesuited figure. At 0.50, the source statue returns.</figcaption></figure>
+          <h4>Eiffel Tower → mechanical giraffe</h4>
+          <blockquote class="prompt"><span>Prompt</span>a high quality photo of a gigantic mechanical giraffe standing in a city park, made of intricate steel framework</blockquote>
+          <figure class="panel"><a class="zoom" href="assets/results/text_edit_eiffel.png"><img src="assets/results/text_edit_eiffel.png" width="1580" height="811" loading="lazy" alt="Eiffel Tower transformed into a steel-framework giraffe at seven starting times"></a><figcaption>At 0.02–0.06, a mechanical giraffe fills the scene. At 0.10–0.14, the animal and tower merge; by 0.25–0.50, the tower’s original structure dominates.</figcaption></figure>
+          <p class="observation"><span>OBSERVATION</span>At intermediate times, the new subjects inherit the landmarks’ compositions. Lower times favor the prompt more strongly, while higher times restore the original landmarks. Starting time therefore controls how much source structure survives the requested transformation.</p>
+        </section>
+
+        <section class="report-section" id="anagrams">
+          <div class="section-heading"><span>3.3</span><h3>Visual anagrams</h3></div>
+          <p>A visual anagram matches one prompt upright and another after a 180° rotation. At each Euler step, I predict guided velocities for both orientations, rotate the second velocity back, and average them. Aligning the predictions before averaging lets both prompts influence the same pixels. Use the buttons below to compare the two readings.</p>
+          <div class="equation"><span>v = ½ [v<sub>CFG</sub>(x, t, c<sub>A</sub>) + F(v<sub>CFG</sub>(F(x), t, c<sub>B</sub>))]</span><small>F rotates by 180°; sampling starts from pure Gaussian noise.</small></div>
+          <div class="interactive-anagrams">
+            <article class="anagram-card"><div class="card-topline"><span>Wizard / castle · seed 180</span><button class="rotate-button" type="button" aria-pressed="false" aria-controls="wizard-preview">Rotate 180° ↻</button></div><div class="rotation-frame"><img id="wizard-preview" src="assets/results/anagram_wizard_castle_upright.webp" width="374" height="374" loading="lazy" alt="Interactive wizard and castle illusion"></div><p class="rotation-caption" aria-live="polite" data-upright="Upright · wizard" data-rotated="Rotated 180° · castle">Upright · wizard</p></article>
+            <article class="anagram-card"><div class="card-topline"><span>Cat / owl · seed 181</span><button class="rotate-button" type="button" aria-pressed="false" aria-controls="cat-preview">Rotate 180° ↻</button></div><div class="rotation-frame"><img id="cat-preview" src="assets/results/anagram_cat_owl_upright.webp" width="374" height="360" loading="lazy" alt="Interactive curled cat and owl illusion"></div><p class="rotation-caption" aria-live="polite" data-upright="Upright · curled cat" data-rotated="Rotated 180° · owl">Upright · curled cat</p></article>
+          </div>
+          <h4>Illusion 01 · wizard / castle</h4>
+          <div class="prompt-pair"><blockquote class="prompt"><span>Upright prompt</span>an oil painting of a wise old wizard with a long white beard</blockquote><blockquote class="prompt"><span>Rotated prompt</span>an oil painting of a medieval castle on a rocky mountain</blockquote></div>
+          <figure class="panel narrow"><a class="zoom" href="assets/results/anagram_wizard_castle.png"><img src="assets/results/anagram_wizard_castle.png" width="793" height="411" loading="lazy" alt="Wizard upright beside the same image rotated 180 degrees to reveal a medieval castle"></a><figcaption>After rotation, the beard becomes castle towers and the darker surrounding shapes suggest rocky ground.</figcaption></figure>
+          <h4>Illusion 02 · curled cat / owl</h4>
+          <div class="prompt-pair"><blockquote class="prompt"><span>Upright prompt</span>a detailed watercolor painting of a sleeping orange cat curled into a circle</blockquote><blockquote class="prompt"><span>Rotated prompt</span>a detailed watercolor painting of a great horned owl facing forward</blockquote></div>
+          <figure class="panel narrow"><a class="zoom" href="assets/results/anagram_cat_owl.png"><img src="assets/results/anagram_cat_owl.png" width="798" height="411" loading="lazy" alt="An orange curled cat upright beside the same watercolor rotated 180 degrees to show an owl"></a><figcaption>The rounded silhouette supports both animals. Rotation emphasizes the owl’s eyes and ears, though hints of the owl remain visible upright.</figcaption></figure>
+        </section>
+
+        <section class="report-section" id="hybrids">
+          <div class="section-heading"><span>3.4</span><h3>Hybrid images</h3></div>
+          <p>Where anagrams change with orientation, hybrid images aim to change with viewing distance. Broad shapes remain visible from far away, while fine details dominate up close. I combine these scales by adding the low-frequency part of one guided velocity to the high-frequency part of another at every sampling step.</p>
+          <p>The full-size and 64 × 64 views below approximate close and distant viewing. The two prompt pairs use seeds 180 and 181, with w = 7 and h = 0.02.</p>
+          <div class="equation"><span>v = lowpass(v<sub>A</sub>) + v<sub>B</sub> − lowpass(v<sub>B</sub>)</span><small>Gaussian low-pass: σ = 16, kernel = 265 × 265 at 512 × 512.</small></div>
+          <h4>Hybrid 01 · wolf / snowy forest</h4>
+          <div class="prompt-pair"><blockquote class="prompt"><span>Distant view · low frequencies</span>a detailed lithograph of a wolf's face, centered and symmetrical</blockquote><blockquote class="prompt"><span>Close view · high frequencies</span>a detailed lithograph of a dense snowy pine forest</blockquote></div>
+          <div class="hybrid-pair"><figure class="hybrid-full"><a class="zoom" href="assets/results/hybrid_wolf_forest.png"><img src="assets/results/hybrid_wolf_forest.png" width="512" height="512" loading="lazy" alt="Full-size hybrid containing a snowy forest whose broad dark and light shapes suggest a wolf's face"></a><figcaption>Close view · 512 × 512</figcaption></figure><figure class="hybrid-distant"><div><a class="zoom" href="assets/results/hybrid_wolf_forest_small.png"><img src="assets/results/hybrid_wolf_forest_small.png" width="64" height="64" loading="lazy" alt="64 by 64 distant view of the wolf and forest hybrid"></a></div><figcaption>Distant view · 64 × 64</figcaption></figure></div>
+          <p class="observation"><span>OBSERVATION</span>The forest dominates up close. In the smaller view, its branches merge into a roughly symmetric face, but the intended wolf remains subtle.</p>
+          <h4>Hybrid 02 · eye / ocean</h4>
+          <div class="prompt-pair"><blockquote class="prompt"><span>Distant view · low frequencies</span>an oil painting of a large human eye, centered</blockquote><blockquote class="prompt"><span>Close view · high frequencies</span>an oil painting of a stormy ocean filled with sailing ships</blockquote></div>
+          <div class="hybrid-pair"><figure class="hybrid-full"><a class="zoom" href="assets/results/hybrid_eye_ocean.png"><img src="assets/results/hybrid_eye_ocean.png" width="512" height="512" loading="lazy" alt="Full-size painting of sailing ships and ocean waves arranged around the broad shape of a human eye"></a><figcaption>Close view · 512 × 512</figcaption></figure><figure class="hybrid-distant"><div><a class="zoom" href="assets/results/hybrid_eye_ocean_small.png"><img src="assets/results/hybrid_eye_ocean_small.png" width="64" height="64" loading="lazy" alt="64 by 64 distant view revealing the broad eye shape in the ocean painting"></a></div><figcaption>Distant view · 64 × 64</figcaption></figure></div>
+          <p class="observation"><span>OBSERVATION</span>The eye reads more clearly at small scale, while ships and waves provide the close-up detail. Both subjects remain visible at full size, so the result blends interpretations rather than fully hiding one.</p>
+        </section>
+
+        <section class="report-section setup" id="part-b">
+          <p class="eyebrow">PART B / LEARNING FROM SCRATCH</p>
+          <h2>Flow matching from scratch</h2>
+          <p>Part A used a pretrained model; here, I trained U-Nets from scratch on MNIST. I began with single-step denoising, then learned a velocity field for generation. All networks use convolution, BatchNorm, GELU, and skip connections. Clean images are scaled to [0, 1], but noisy inputs and predicted velocities are not clipped during training.</p>
+          <div class="parameter-strip" aria-label="Part B dataset"><div><span>IMAGE SIZE</span><strong>28 × 28</strong></div><div><span>TRAIN IMAGES</span><strong>60,000</strong></div><div><span>TEST IMAGES</span><strong>10,000</strong></div><div><span>DIGIT CLASSES</span><strong>0–9</strong></div></div>
+          <p class="source-note">Project brief: <a href="https://cal-cs180.github.io/fa26/hw/proj3-flow/partb.html">CS180 Part B handout ↗</a>. All figures below are saved notebook outputs. Loss plots show batch MSE in blue and its 100-step moving average in orange.</p>
+        </section>
+
+        <section class="report-section mnist-results" id="b-noising">
+          <div class="section-heading"><span>1.2</span><h3>Watching a digit disappear into noise</h3></div>
+          <p>For the first experiment, I corrupted a clean digit x using z = x + σ ε, where ε is standard Gaussian noise. Increasing σ while holding the digit and noise pattern fixed shows how the strokes become harder to distinguish from noise.</p>
+          <figure class="panel"><a href="assets/partb/noising.png"><img src="assets/partb/noising.png" width="1389" height="271" loading="lazy" alt="MNIST digit 5 with Gaussian noise levels 0, 0.2, 0.4, 0.5, 0.6, 0.8, and 1.0"></a><figcaption>σ = 0.0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0. Only the display maps values outside [0, 1] to black or white.</figcaption></figure>
+        </section>
+
+        <section class="report-section mnist-results" id="b-denoising">
+          <div class="section-heading"><span>1.2.1</span><h3>Single-step denoising</h3></div>
+          <p>I trained a U-Net to recover clean images from inputs at σ = 0.5, drawing fresh noise for every batch. The model uses 128 base channels (D = 128), batch size 256, and five epochs of Adam with learning rate 10<sup>−4</sup>. MSE compares each prediction with its clean target. By epoch 5, most background noise is removed, though the strokes remain slightly soft.</p>
+          <div class="figure-stack">
+            <figure class="panel"><a href="assets/partb/denoising-epoch-1.png"><img src="assets/partb/denoising-epoch-1.png" width="980" height="334" loading="lazy" alt="Single-step denoising after epoch 1: clean digits, inputs at sigma 0.5, and reconstructed digits"></a><figcaption>Epoch 1. Rows: clean targets, noisy inputs, predictions.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/denoising-epoch-5.png"><img src="assets/partb/denoising-epoch-5.png" width="980" height="334" loading="lazy" alt="Single-step denoising after epoch 5 using the same test images and noise"></a><figcaption>Epoch 5. The same test inputs make the improvement directly comparable.</figcaption></figure>
+            <figure class="panel loss-panel"><a href="assets/partb/denoising-loss.png"><img src="assets/partb/denoising-loss.png" width="779" height="290" loading="lazy" alt="Single-step denoising training MSE across all five epochs"></a><figcaption>Training loss over all five epochs: a steep initial drop followed by gradual refinement.</figcaption></figure>
+          </div>
+        </section>
+
+        <section class="report-section mnist-results" id="b-ood">
+          <div class="section-heading"><span>1.2.2</span><h3>Testing unseen noise levels</h3></div>
+          <p>I then tested the epoch-5 model across a range of noise levels, including σ = 0.5 as a reference. With the digits and noise pattern fixed, lower σ gives recognizable reconstructions, although even clean inputs are smoothed. At σ = 0.8–1.0, distorted strokes and residual noise become more prominent.</p>
+          <p class="source-note">Rows: clean targets, noisy inputs, predictions.</p>
+          <div class="figure-stack">
+            <figure class="panel"><a href="assets/partb/ood-sigma-0.png"><img src="assets/partb/ood-sigma-0.png" width="980" height="334" loading="lazy" alt="Epoch-5 denoising results at sigma 0.0"></a><figcaption>σ = 0.0 · clean input.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/ood-sigma-02.png"><img src="assets/partb/ood-sigma-02.png" width="980" height="334" loading="lazy" alt="Epoch-5 denoising results at sigma 0.2"></a><figcaption>σ = 0.2.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/ood-sigma-04.png"><img src="assets/partb/ood-sigma-04.png" width="980" height="334" loading="lazy" alt="Epoch-5 denoising results at sigma 0.4"></a><figcaption>σ = 0.4.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/ood-sigma-05.png"><img src="assets/partb/ood-sigma-05.png" width="980" height="334" loading="lazy" alt="Epoch-5 denoising results at sigma 0.5, the training noise level"></a><figcaption>σ = 0.5 · the training noise level, included as a reference.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/ood-sigma-06.png"><img src="assets/partb/ood-sigma-06.png" width="980" height="334" loading="lazy" alt="Epoch-5 denoising results at sigma 0.6"></a><figcaption>σ = 0.6.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/ood-sigma-08.png"><img src="assets/partb/ood-sigma-08.png" width="980" height="334" loading="lazy" alt="Epoch-5 denoising results at sigma 0.8 with increasingly distorted strokes"></a><figcaption>σ = 0.8.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/ood-sigma-1.png"><img src="assets/partb/ood-sigma-1.png" width="980" height="334" loading="lazy" alt="Epoch-5 denoising results at sigma 1.0 with residual noise and ambiguous digits"></a><figcaption>σ = 1.0 · substantial corruption remains in the predictions.</figcaption></figure>
+          </div>
+        </section>
+
+        <section class="report-section mnist-results" id="b-pure-noise">
+          <div class="section-heading"><span>1.2.3</span><h3>Why pure noise produces an average</h3></div>
+          <p>The previous inputs still contained the target digit. To remove that information, I trained a fresh U-Net on pure Gaussian noise with the same settings and clean targets. Because noise and target are independent, MSE favors the pixel-wise average of digits 0–9. The nearly identical blurry outputs below reflect this averaging, rather than successful generation of individual digits.</p>
+          <div class="figure-stack">
+            <figure class="panel"><a href="assets/partb/pure-noise-epoch-1.png"><img src="assets/partb/pure-noise-epoch-1.png" width="1189" height="166" loading="lazy" alt="Pure-noise model after epoch 1 producing ten similar blurred digit averages"></a><figcaption>Epoch 1 · different noise inputs, almost identical outputs.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/pure-noise-epoch-5.png"><img src="assets/partb/pure-noise-epoch-5.png" width="1189" height="166" loading="lazy" alt="Pure-noise model after epoch 5 still producing nearly identical average digits"></a><figcaption>Epoch 5 · more training does not resolve the missing information.</figcaption></figure>
+            <figure class="panel loss-panel"><a href="assets/partb/pure-noise-loss.png"><img src="assets/partb/pure-noise-loss.png" width="788" height="290" loading="lazy" alt="Pure-noise model training loss decreasing and plateauing above zero"></a><figcaption>The loss plateaus: one average image cannot match every target digit.</figcaption></figure>
+          </div>
+        </section>
+
+        <section class="report-section mnist-results" id="b-time">
+          <div class="section-heading"><span>2.1–2.3</span><h3>Time-conditioned flow matching</h3></div>
+          <p>To generate digits, I switched from one-step reconstruction to flow matching. Training pairs Gaussian noise x<sub>0</sub> with a clean digit x<sub>1</sub>, samples a time t, and constructs x<sub>t</sub> = (1 − t)x<sub>0</sub> + tx<sub>1</sub>. The U-Net predicts the target velocity x<sub>1</sub> − x<sub>0</sub>, using learned time embeddings at two decoder stages. At inference, Euler sampling follows these predictions from noise toward an image.</p>
+          <p>I trained with D = 64, batch size 64, and ten epochs of Adam, starting at learning rate 10<sup>−2</sup> and decaying it each epoch by γ = 0.1<sup>1/10</sup>. Generation uses 50 Euler steps and seeds 0–9, held fixed across epochs.</p>
+          <div class="figure-stack">
+            <figure class="panel"><a href="assets/partb/time-epoch-1.png"><img src="assets/partb/time-epoch-1.png" width="1189" height="166" loading="lazy" alt="Ten time-conditioned flow samples after epoch 1, including malformed handwritten digits"></a><figcaption>Epoch 1.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/time-epoch-5.png"><img src="assets/partb/time-epoch-5.png" width="1189" height="166" loading="lazy" alt="The same ten sampling seeds after epoch 5 of time-conditioned flow training"></a><figcaption>Epoch 5.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/time-epoch-10.png"><img src="assets/partb/time-epoch-10.png" width="1189" height="166" loading="lazy" alt="The same ten seeds after epoch 10, showing recognizable but imperfect generated digits"></a><figcaption>Epoch 10 · recognizable digits emerge, but time-only generation is still imperfect.</figcaption></figure>
+            <figure class="panel loss-panel"><a href="assets/partb/time-loss.png"><img src="assets/partb/time-loss.png" width="790" height="290" loading="lazy" alt="Time-conditioned flow-matching training loss across ten epochs"></a><figcaption>Velocity-prediction MSE over ten epochs.</figcaption></figure>
+          </div>
+        </section>
+
+        <section class="report-section mnist-results" id="b-class">
+          <div class="section-heading"><span>2.4–2.6</span><h3>Giving the model a digit class</h3></div>
+          <p>Time conditioning identifies the stage of generation, but not the desired digit. I added one-hot class embeddings to provide that control, keeping the same training width, batch size, and Adam schedule. Dropping class information for 10% of examples also trains the unconditional prediction needed for CFG.</p>
+          <p>At sampling time, I combine the two predictions as v = v<sub>uncond</sub> + 5(v<sub>cond</sub> − v<sub>uncond</sub>) and take 300 Euler steps. Unlike Part A’s convention, guidance scale 1 here gives ordinary conditional sampling.</p>
+          <p class="source-note">Columns request digits 0–9; rows use seeds 0–3, fixed across epochs. The backgrounds become cleaner and the requested digits more consistent by epochs 5 and 10.</p>
+          <div class="figure-stack">
+            <figure class="panel"><a href="assets/partb/class-scheduled-epoch-1.png"><img src="assets/partb/class-scheduled-epoch-1.png" width="1029" height="449" loading="lazy" alt="Four samples per requested digit 0 through 9 after epoch 1 with the learning-rate scheduler"></a><figcaption>Epoch 1 · class structure is visible, with residual noise and malformed strokes.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/class-scheduled-epoch-5.png"><img src="assets/partb/class-scheduled-epoch-5.png" width="1029" height="449" loading="lazy" alt="Four samples per digit after epoch 5 with the learning-rate scheduler"></a><figcaption>Epoch 5.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/class-scheduled-epoch-10.png"><img src="assets/partb/class-scheduled-epoch-10.png" width="1029" height="449" loading="lazy" alt="Four legible samples per digit after epoch 10 with the learning-rate scheduler"></a><figcaption>Epoch 10 · four examples of each requested digit.</figcaption></figure>
+            <figure class="panel loss-panel"><a href="assets/partb/class-scheduled-loss.png"><img src="assets/partb/class-scheduled-loss.png" width="790" height="290" loading="lazy" alt="Class-conditioned flow-matching training loss with exponential learning-rate decay"></a><figcaption>Class-conditioned training loss with exponential learning-rate decay.</figcaption></figure>
+          </div>
+        </section>
+
+        <section class="report-section mnist-results" id="b-no-scheduler">
+          <div class="section-heading"><span>2.6 ↳</span><h3>Can we remove the scheduler?</h3></div>
+          <p>Finally, I removed the scheduler and trained a fresh model at a constant learning rate of 3 × 10<sup>−3</sup>. This lower rate replaces the scheduled run’s larger initial updates with a compromise that also allows later refinement. The architecture, batch size, and ten-epoch budget stay unchanged.</p>
+          <p>With identical sampling seeds, 300 Euler steps, and guidance scale 5, both final grids contain legible digits with different strokes. Their quality is visually comparable, but unmatched initialization and training randomness prevent a controlled claim of equal performance.</p>
+          <div class="figure-stack">
+            <figure class="panel"><a href="assets/partb/class-constant-epoch-1.png"><img src="assets/partb/class-constant-epoch-1.png" width="1029" height="449" loading="lazy" alt="Four samples per digit after epoch 1 with constant learning rate 0.003"></a><figcaption>Epoch 1 · constant learning rate 0.003.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/class-constant-epoch-5.png"><img src="assets/partb/class-constant-epoch-5.png" width="1029" height="449" loading="lazy" alt="Four samples per digit after epoch 5 without a learning-rate scheduler"></a><figcaption>Epoch 5.</figcaption></figure>
+            <figure class="panel"><a href="assets/partb/class-constant-epoch-10.png"><img src="assets/partb/class-constant-epoch-10.png" width="1029" height="449" loading="lazy" alt="Four legible samples per digit after epoch 10 without a learning-rate scheduler"></a><figcaption>Epoch 10 · the same sampling seeds as the scheduled model.</figcaption></figure>
+            <figure class="panel loss-panel"><a href="assets/partb/class-constant-loss.png"><img src="assets/partb/class-constant-loss.png" width="798" height="290" loading="lazy" alt="Class-conditioned training loss at constant learning rate 0.003 across ten epochs"></a><figcaption>Training loss without a scheduler. Both class-conditioned runs use 9,380 optimizer steps.</figcaption></figure>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
