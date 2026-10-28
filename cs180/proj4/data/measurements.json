@@ -1,0 +1,31 @@
+{
+  "pair_errors": [
+    {
+      "scene": "UAVs@Berkeley lab",
+      "points": 8,
+      "mean_error_px": 3.659846420364636
+    },
+    {
+      "scene": "Wheeler Hall exterior",
+      "points": 9,
+      "mean_error_px": 4.053553718722042
+    },
+    {
+      "scene": "Wheeler Hall interior",
+      "points": 8,
+      "mean_error_px": 3.1517355264736233
+    }
+  ],
+  "warp_seconds": {
+    "club_lab_normal_club_lab_angled_nn": 0.577,
+    "club_lab_normal_club_lab_angled_bilinear": 1.648,
+    "wheeler_hall_exterior_normal_wheeler_hall_exterior_angled_nn": 0.73,
+    "wheeler_hall_exterior_normal_wheeler_hall_exterior_angled_bilinear": 2.047,
+    "wheeler_hall_interior_normal_wheeler_hall_interior_angled_nn": 0.614,
+    "wheeler_hall_interior_normal_wheeler_hall_interior_angled_bilinear": 1.739,
+    "book_rectification_nn": 0.066,
+    "book_rectification_bilinear": 0.171,
+    "poster_rectification_nn": 0.142,
+    "poster_rectification_bilinear": 0.387
+  }
+}

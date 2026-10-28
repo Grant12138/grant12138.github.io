@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Grant Luo's CS180 Project 4A: homographies, inverse warping, image rectification, and three feathered photo mosaics.">
+  <title>Project 4A · Image Warping &amp; Mosaicing · Grant Luo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to results</a>
+<header>
+  <p class="eyebrow">UC BERKELEY · CS180 · FALL 2026</p>
+  <h1>Project 4A: Image Warping &amp; Mosaicing</h1>
+  <p>Grant Luo</p>
+  <p>Recovering homographies from manual matches, rectifying planar objects, and blending overlapping photographs.</p>
+  <nav aria-label="Project sections"><a href="#a1">A.1 · Pictures</a><a href="#a2">A.2 · Homographies</a><a href="#a3">A.3 · Rectification</a><a href="#a4">A.4 · Mosaics</a></nav>
+</header>
+<main id="main">
+<section id="a1"><h2>A.1 · Shoot the pictures</h2>
+  <p>These three pairs show the UAVs@Berkeley lab and the exterior and interior of Wheeler Hall. Each pair has substantial overlap and is intended to approximate a camera rotation about a fixed center. Residual parallax and moving subjects are visible in some final mosaics.</p>
+  <article id="sources-lab"><h3>UAVs@Berkeley lab</h3>
+      <div class="images two"><figure class=""><a href="assets/lab-source1.webp"><img src="assets/lab-source1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="UAVs@Berkeley lab, first photograph"></a><figcaption>Image 1 — source</figcaption></figure>
+      <figure class=""><a href="assets/lab-source2.webp"><img src="assets/lab-source2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="UAVs@Berkeley lab, second photograph"></a><figcaption>Image 2 — reference</figcaption></figure></div></article><article id="sources-exterior"><h3>Wheeler Hall exterior</h3>
+      <div class="images two"><figure class=""><a href="assets/exterior-source1.webp"><img src="assets/exterior-source1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Wheeler Hall exterior, first photograph"></a><figcaption>Image 1 — source</figcaption></figure>
+      <figure class=""><a href="assets/exterior-source2.webp"><img src="assets/exterior-source2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Wheeler Hall exterior, second photograph"></a><figcaption>Image 2 — reference</figcaption></figure></div></article><article id="sources-interior"><h3>Wheeler Hall interior</h3>
+      <div class="images two"><figure class=""><a href="assets/interior-source1.webp"><img src="assets/interior-source1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Wheeler Hall interior, first photograph"></a><figcaption>Image 1 — source</figcaption></figure>
+      <figure class=""><a href="assets/interior-source2.webp"><img src="assets/interior-source2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Wheeler Hall interior, second photograph"></a><figcaption>Image 2 — reference</figcaption></figure></div></article>
+  <p class="small">Source photographs and point coordinates use the original image resolution. Display copies are resized for the web. Click any image to inspect it separately.</p>
+</section>
+<section id="a2"><h2>A.2 · Recover homographies</h2>
+  <p>I manually selected corresponding points and estimated a 3 × 3 homography H with eight unknowns, fixing h<sub>33</sub> = 1. Each pair contributes two equations. Using more than four pairs gives an overdetermined system, solved with a least-squares solver.</p>
+  <div class="equation">[u, v, w]<sup>T</sup> = H[x, y, 1]<sup>T</sup>, &nbsp; x′ = u/w, &nbsp; y′ = v/w</div>
+  <p>With h = [h<sub>11</sub>, h<sub>12</sub>, h<sub>13</sub>, h<sub>21</sub>, h<sub>22</sub>, h<sub>23</sub>, h<sub>31</sub>, h<sub>32</sub>]<sup>T</sup>, each correspondence supplies this block of A and b:</p>
+  <pre aria-label="Homography linear system">[ x  y  1  0  0  0  −xx′  −yx′ ]       [ x′ ]
+[ 0  0  0  x  y  1  −xy′  −yy′ ] h  =  [ y′ ]
+
+Stack all point pairs: A h = b
+Solve: ĥ = argmin_h ‖A h − b‖²</pre>
+  <article><h3>UAVs@Berkeley lab</h3>
+      <p>8 manually selected pairs · A is 16 × 8 · mean reprojection error: 3.66 px.</p>
+      <div class="images two"><figure class=""><a href="assets/lab-points1.webp"><img src="assets/lab-points1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Image 1 — numbered points"></a><figcaption>Image 1 — numbered points</figcaption></figure>
+      <figure class=""><a href="assets/lab-points2.webp"><img src="assets/lab-points2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Image 2 — matching numbers"></a><figcaption>Image 2 — matching numbers</figcaption></figure></div>
+      <p class="small">H maps image 1 into image 2. Errors are measured at the selected points in the original image resolution.</p>
+      <pre aria-label="UAVs@Berkeley lab homography">[  1.54233   0.108255  -1693.81 ]
+[  0.089082   1.32739  -195.556 ]
+[  0.000125842   9.31129e-06   1 ]</pre>
+      <p class="small"><a href="data/club_lab_normal_club_lab_angled.json">Point coordinates (JSON)</a> · <a href="data/lab-H.txt">Homography (text)</a></p></article><article><h3>Wheeler Hall exterior</h3>
+      <p>9 manually selected pairs · A is 18 × 8 · mean reprojection error: 4.05 px.</p>
+      <div class="images two"><figure class=""><a href="assets/exterior-points1.webp"><img src="assets/exterior-points1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Image 1 — numbered points"></a><figcaption>Image 1 — numbered points</figcaption></figure>
+      <figure class=""><a href="assets/exterior-points2.webp"><img src="assets/exterior-points2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Image 2 — matching numbers"></a><figcaption>Image 2 — matching numbers</figcaption></figure></div>
+      <p class="small">H maps image 1 into image 2. Errors are measured at the selected points in the original image resolution.</p>
+      <pre aria-label="Wheeler Hall exterior homography">[  1.81614  -0.211557  -2105.99 ]
+[  0.496593   1.40938  -920.543 ]
+[  0.000221323  -5.02949e-05   1 ]</pre>
+      <p class="small"><a href="data/wheeler_hall_exterior_normal_wheeler_hall_exterior_angled.json">Point coordinates (JSON)</a> · <a href="data/exterior-H.txt">Homography (text)</a></p></article><article><h3>Wheeler Hall interior</h3>
+      <p>8 manually selected pairs · A is 16 × 8 · mean reprojection error: 3.15 px.</p>
+      <div class="images two"><figure class=""><a href="assets/interior-points1.webp"><img src="assets/interior-points1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Image 1 — numbered points"></a><figcaption>Image 1 — numbered points</figcaption></figure>
+      <figure class=""><a href="assets/interior-points2.webp"><img src="assets/interior-points2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Image 2 — matching numbers"></a><figcaption>Image 2 — matching numbers</figcaption></figure></div>
+      <p class="small">H maps image 1 into image 2. Errors are measured at the selected points in the original image resolution.</p>
+      <pre aria-label="Wheeler Hall interior homography">[  1.61964  -0.033418  -1696.5 ]
+[  0.24157   1.33419  -599.065 ]
+[  0.000160956  -2.07657e-05   1 ]</pre>
+      <p class="small"><a href="data/wheeler_hall_interior_normal_wheeler_hall_interior_angled.json">Point coordinates (JSON)</a> · <a href="data/interior-H.txt">Homography (text)</a></p></article>
+</section>
+<section id="a3"><h2>A.3 · Warp and rectify images</h2>
+  <p>I used inverse warping: for every output pixel, H<sup>−1</sup> gives its source location. Automatic canvas bounds come from transforming the four source corners; the minimum x and y coordinates provide the canvas offset. A validity mask marks locations outside the source as transparent.</p>
+  <p>Pixel centers use (x, y), while arrays are indexed by row, then column. For output array position (row r, column c), I inverse-map [c + x<sub>min</sub>, r + y<sub>min</sub>, 1]<sup>T</sup> and divide by the third coordinate.</p>
+  <p><strong>Nearest neighbor</strong> rounds to the nearest pixel. <strong>Bilinear interpolation</strong> uses the four neighbors, with α = x − ⌊x⌋ and β = y − ⌊y⌋:</p>
+  <pre>C = (1−α)(1−β) I[y₀,   x₀] + α(1−β) I[y₀,   x₀+1]
+  + (1−α)β     I[y₀+1, x₀] + αβ     I[y₀+1, x₀+1]</pre>
+  <p>For each object, I mapped its four corners (top-left, top-right, bottom-right, bottom-left) to a rectangle with its measured aspect ratio. Rectification uses a fixed destination crop, so only the object is included.</p>
+  <article><h3>Book</h3>
+      <p>Measured width × height: 17.8 × 25.3 cm. Output: 890 × 1265 pixels, preserving the measured proportions at 50 pixels/cm.</p>
+      <div class="images three rectifications">
+      <figure class=""><a href="assets/book-original.webp"><img src="assets/book-original.webp" width="787" height="1050" loading="lazy" decoding="async" alt="Original — selected corners"></a><figcaption>Original — selected corners</figcaption></figure>
+      <figure class=""><a href="assets/book-nn.webp"><img src="assets/book-nn.webp" width="890" height="1265" loading="lazy" decoding="async" alt="Nearest neighbor"></a><figcaption>Nearest neighbor</figcaption></figure>
+      <figure class=""><a href="assets/book-bilinear.webp"><img src="assets/book-bilinear.webp" width="890" height="1265" loading="lazy" decoding="async" alt="Bilinear"></a><figcaption>Bilinear</figcaption></figure></div>
+      <details><summary>Compare enlarged crops of the same text</summary>
+      <div class="images two crops"><figure class=""><a href="assets/book-nn-crop.webp"><img src="assets/book-nn-crop.webp" width="300" height="180" loading="lazy" decoding="async" alt="Nearest neighbor — detail"></a><figcaption>Nearest neighbor — detail</figcaption></figure>
+      <figure class=""><a href="assets/book-bilinear-crop.webp"><img src="assets/book-bilinear-crop.webp" width="300" height="180" loading="lazy" decoding="async" alt="Bilinear — detail"></a><figcaption>Bilinear — detail</figcaption></figure></div></details>
+      <p class="small"><a href="data/book_rectification.json">Source corners and destination size</a> · <a href="data/book-rectification-H.txt">Rectification homography</a></p></article><article><h3>Poster</h3>
+      <p>Measured width × height: 30 × 42 cm. Output: 1500 × 2100 pixels, preserving the measured proportions at 50 pixels/cm.</p>
+      <div class="images three rectifications">
+      <figure class=""><a href="assets/poster-original.webp"><img src="assets/poster-original.webp" width="787" height="1050" loading="lazy" decoding="async" alt="Original — selected corners"></a><figcaption>Original — selected corners</figcaption></figure>
+      <figure class=""><a href="assets/poster-nn.webp"><img src="assets/poster-nn.webp" width="1500" height="2100" loading="lazy" decoding="async" alt="Nearest neighbor"></a><figcaption>Nearest neighbor</figcaption></figure>
+      <figure class=""><a href="assets/poster-bilinear.webp"><img src="assets/poster-bilinear.webp" width="1500" height="2100" loading="lazy" decoding="async" alt="Bilinear"></a><figcaption>Bilinear</figcaption></figure></div>
+      <details><summary>Compare enlarged crops of the same text</summary>
+      <div class="images two crops"><figure class=""><a href="assets/poster-nn-crop.webp"><img src="assets/poster-nn-crop.webp" width="300" height="180" loading="lazy" decoding="async" alt="Nearest neighbor — detail"></a><figcaption>Nearest neighbor — detail</figcaption></figure>
+      <figure class=""><a href="assets/poster-bilinear-crop.webp"><img src="assets/poster-bilinear-crop.webp" width="300" height="180" loading="lazy" decoding="async" alt="Bilinear — detail"></a><figcaption>Bilinear — detail</figcaption></figure></div></details>
+      <p class="small"><a href="data/poster_rectification.json">Source corners and destination size</a> · <a href="data/poster-rectification-H.txt">Rectification homography</a></p></article>
+  <div class="table-wrap"><table><caption>Measured warp time, one local run; excludes image loading and file saving.</caption>
+    <thead><tr><th scope="col">Image</th><th scope="col">Output</th><th scope="col">Nearest</th><th scope="col">Bilinear</th><th scope="col">Time ratio</th></tr></thead>
+    <tbody><tr><th scope="row">Book</th><td>890 × 1265</td><td>0.066 s</td><td>0.171 s</td><td>2.6×</td></tr><tr><th scope="row">Poster</th><td>1500 × 2100</td><td>0.142 s</td><td>0.387 s</td><td>2.7×</td></tr></tbody></table></div>
+  <p>Nearest neighbor is faster because it reads one source pixel. It leaves more jagged text edges and fine-detail aliasing. Bilinear blends four pixels, giving smoother edges at a higher runtime cost and slightly softening small details. The text crops make the difference easier to see; neither method includes an antialiasing prefilter for strong downsampling.</p>
+</section>
+<section id="a4"><h2>A.4 · Blend images into mosaics</h2>
+  <p>I kept image 2’s projection as the reference. The union of its bounds and the transformed bounds of image 1 defines a shared canvas. Both images are sampled onto that canvas using bilinear inverse warping; image 2 uses the identity transform.</p>
+  <p>For feathering, each image receives weights equal to the distance from a valid pixel to its mask boundary, using a distance transform. A zero border is added around each mask. The normalized weighted average preserves non-overlapping regions and softens the transition in the overlap:</p>
+  <div class="equation">M = (w<sub>1</sub>I<sub>1</sub> + w<sub>2</sub>I<sub>2</sub>) / (w<sub>1</sub> + w<sub>2</sub>)</div>
+  <p>Locations with no valid source data remain transparent. Feathering reduces seams but does not correct geometric misalignment or moving subjects.</p>
+  <article><h3>UAVs@Berkeley lab</h3><div class="images two mosaic-sources">
+      <figure class=""><a href="assets/lab-source1.webp"><img src="assets/lab-source1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Source image 1"></a><figcaption>Source image 1</figcaption></figure><figure class=""><a href="assets/lab-source2.webp"><img src="assets/lab-source2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Reference image 2"></a><figcaption>Reference image 2</figcaption></figure></div>
+      <figure class="mosaic"><a href="assets/lab-mosaic.webp"><img src="assets/lab-mosaic.webp" width="2400" height="1639" loading="lazy" decoding="async" alt="UAVs@Berkeley lab blended mosaic"></a><figcaption>Bilinear inverse warp + distance-weighted feathering</figcaption></figure>
+      <p>The right side aligns near the selected points, but the posters and equipment farther left show substantial ghosting. Matches are concentrated on the right; parallax and extrapolation limit the alignment elsewhere.</p></article><article><h3>Wheeler Hall exterior</h3><div class="images two mosaic-sources">
+      <figure class=""><a href="assets/exterior-source1.webp"><img src="assets/exterior-source1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Source image 1"></a><figcaption>Source image 1</figcaption></figure><figure class=""><a href="assets/exterior-source2.webp"><img src="assets/exterior-source2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Reference image 2"></a><figcaption>Reference image 2</figcaption></figure></div>
+      <figure class="mosaic"><a href="assets/exterior-mosaic.webp"><img src="assets/exterior-mosaic.webp" width="2400" height="1605" loading="lazy" decoding="async" alt="Wheeler Hall exterior blended mosaic"></a><figcaption>Bilinear inverse warp + distance-weighted feathering</figcaption></figure>
+      <p>The building facade aligns well. A person in the foreground appears partially transparent because they moved between exposures; feathering cannot correct motion.</p></article><article><h3>Wheeler Hall interior</h3><div class="images two mosaic-sources">
+      <figure class=""><a href="assets/interior-source1.webp"><img src="assets/interior-source1.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Source image 1"></a><figcaption>Source image 1</figcaption></figure><figure class=""><a href="assets/interior-source2.webp"><img src="assets/interior-source2.webp" width="1400" height="1050" loading="lazy" decoding="async" alt="Reference image 2"></a><figcaption>Reference image 2</figcaption></figure></div>
+      <figure class="mosaic"><a href="assets/interior-mosaic.webp"><img src="assets/interior-mosaic.webp" width="2371" height="1700" loading="lazy" decoding="async" alt="Wheeler Hall interior blended mosaic"></a><figcaption>Bilinear inverse warp + distance-weighted feathering</figcaption></figure>
+      <p>The wall and booth largely align, while the arch and floor show some doubling. The small error at the clicked points does not guarantee alignment at other depths.</p></article>
+</section>
+</main>
+<footer>Grant Luo · CS180 Project 4, Part A · <a href="https://cal-cs180.github.io/fa26/hw/proj3/partA.html">Assignment instructions</a></footer>
+</body>
+</html>
