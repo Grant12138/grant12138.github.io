@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Grant Luo's CS180 Project 4A: homographies, inverse warping, image rectification, and three feathered photo mosaics.">
-  <title>Project 4A · Image Warping &amp; Mosaicing · Grant Luo</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="description" content="Grant Luo's CS180 Project 4 on homographies, image rectification, and manual and automatic photo mosaics.">
+  <title>Project 4 · Image Warping &amp; Mosaicing · Grant Luo</title>
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 <a class="skip" href="#main">Skip to results</a>
 <header>
   <p class="eyebrow">UC BERKELEY · CS180 · FALL 2026</p>
-  <h1>Project 4A: Image Warping &amp; Mosaicing</h1>
+  <h1>Project 4 · Image Warping &amp; Mosaicing</h1>
   <p>Grant Luo</p>
-  <p>Recovering homographies from manual matches, rectifying planar objects, and blending overlapping photographs.</p>
-  <nav aria-label="Project sections"><a href="#a1">A.1 · Pictures</a><a href="#a2">A.2 · Homographies</a><a href="#a3">A.3 · Rectification</a><a href="#a4">A.4 · Mosaics</a></nav>
+  <p>Rectifying planar objects and stitching overlapping photographs using manual and automatic correspondences.</p>
+  <nav aria-label="Project sections"><a href="#a1">A.1 · Pictures</a><a href="#a2">A.2 · Homographies</a><a href="#a3">A.3 · Rectification</a><a href="#a4">A.4 · Mosaics</a><a href="#b1">B.1 · Corners</a><a href="#b2">B.2 · Descriptors</a><a href="#b3">B.3 · Matching</a><a href="#b4">B.4 · Automatic mosaics</a></nav>
 </header>
 <main id="main">
 <section id="a1"><h2>A.1 · Shoot the pictures</h2>
@@ -110,7 +110,75 @@ Solve: ĥ = argmin_h ‖A h − b‖²</pre>
       <figure class="mosaic"><a href="assets/interior-mosaic.webp"><img src="assets/interior-mosaic.webp" width="2371" height="1700" loading="lazy" decoding="async" alt="Wheeler Hall interior blended mosaic"></a><figcaption>Bilinear inverse warp + distance-weighted feathering</figcaption></figure>
       <p>The wall and booth largely align, while the arch and floor show some doubling. The small error at the clicked points does not guarantee alignment at other depths.</p></article>
 </section>
+<section id="b1">
+  <h2>B.1 · Harris corner detection</h2>
+  <p>I detected Harris corners at a single scale. Each comparison shows the 500 strongest responses and 500 corners selected with adaptive non-maximal suppression from the 5,000 strongest candidates. ANMS favors points farther from a substantially stronger corner.</p>
+  <article>
+    <h3>UAVs@Berkeley lab</h3>
+    <div class="images two">
+      <figure><a href="assets/part-b/lab-harris.webp"><img src="assets/part-b/lab-harris.webp" width="1400" height="1050" loading="lazy" alt="Strongest Harris responses overlaid on the lab photograph"></a><figcaption>500 strongest Harris corners</figcaption></figure>
+      <figure><a href="assets/part-b/lab-anms.webp"><img src="assets/part-b/lab-anms.webp" width="1400" height="1050" loading="lazy" alt="ANMS-selected corners overlaid on the lab photograph"></a><figcaption>500 ANMS-selected corners</figcaption></figure>
+    </div>
+  </article>
+  <article>
+    <h3>Wheeler Hall exterior</h3>
+    <div class="images two">
+      <figure><a href="assets/part-b/exterior-harris.webp"><img src="assets/part-b/exterior-harris.webp" width="1400" height="1050" loading="lazy" alt="Strongest Harris responses overlaid on the Wheeler Hall exterior"></a><figcaption>500 strongest Harris corners</figcaption></figure>
+      <figure><a href="assets/part-b/exterior-anms.webp"><img src="assets/part-b/exterior-anms.webp" width="1400" height="1050" loading="lazy" alt="ANMS-selected corners overlaid on the Wheeler Hall exterior"></a><figcaption>500 ANMS-selected corners</figcaption></figure>
+    </div>
+  </article>
+  <article>
+    <h3>Wheeler Hall interior</h3>
+    <div class="images two">
+      <figure><a href="assets/part-b/interior-harris.webp"><img src="assets/part-b/interior-harris.webp" width="1400" height="1050" loading="lazy" alt="Strongest Harris responses overlaid on the Wheeler Hall interior"></a><figcaption>500 strongest Harris corners</figcaption></figure>
+      <figure><a href="assets/part-b/interior-anms.webp"><img src="assets/part-b/interior-anms.webp" width="1400" height="1050" loading="lazy" alt="ANMS-selected corners overlaid on the Wheeler Hall interior"></a><figcaption>500 ANMS-selected corners</figcaption></figure>
+    </div>
+  </article>
+</section>
+<section id="b2">
+  <h2>B.2 · Feature descriptors</h2>
+  <p>For each selected corner, I averaged 5 × 5 blocks from an axis-aligned 40 × 40 grayscale window to form an 8 × 8 patch. I subtracted the patch mean and divided by its standard deviation. The examples are enlarged and share a display range of −3 to +3 normalized intensity units.</p>
+  <div class="images">
+    <figure><a href="assets/part-b/lab-descriptors.webp"><img src="assets/part-b/lab-descriptors.webp" width="832" height="104" loading="lazy" alt="Eight normalized feature patches from the lab"></a><figcaption>UAVs@Berkeley lab</figcaption></figure>
+    <figure><a href="assets/part-b/exterior-descriptors.webp"><img src="assets/part-b/exterior-descriptors.webp" width="832" height="104" loading="lazy" alt="Eight normalized feature patches from the Wheeler Hall exterior"></a><figcaption>Wheeler Hall exterior</figcaption></figure>
+    <figure><a href="assets/part-b/interior-descriptors.webp"><img src="assets/part-b/interior-descriptors.webp" width="832" height="104" loading="lazy" alt="Eight normalized feature patches from the Wheeler Hall interior"></a><figcaption>Wheeler Hall interior</figcaption></figure>
+  </div>
+</section>
+<section id="b3">
+  <h2>B.3 · Feature matching</h2>
+  <p>For each descriptor in image 1, I compared the two closest descriptors in image 2. A match passed when its nearest squared distance was less than 0.65 times its second-nearest squared distance. Cyan lines show matches accepted by the RANSAC consensus, and orange lines show matches rejected at that stage.</p>
+  <div class="images">
+    <figure><a href="assets/part-b/lab-matches.webp"><img src="assets/part-b/lab-matches.webp" width="2000" height="750" loading="lazy" alt="Feature correspondences across the two lab photographs"></a><figcaption>UAVs@Berkeley lab · 57 inliers from 133 tentative matches</figcaption></figure>
+    <figure><a href="assets/part-b/exterior-matches.webp"><img src="assets/part-b/exterior-matches.webp" width="2000" height="750" loading="lazy" alt="Feature correspondences across the two Wheeler Hall exterior photographs"></a><figcaption>Wheeler Hall exterior · 49 inliers from 68 tentative matches</figcaption></figure>
+    <figure><a href="assets/part-b/interior-matches.webp"><img src="assets/part-b/interior-matches.webp" width="2000" height="750" loading="lazy" alt="Feature correspondences across the two Wheeler Hall interior photographs"></a><figcaption>Wheeler Hall interior · 45 inliers from 132 tentative matches</figcaption></figure>
+  </div>
+</section>
+<section id="b4">
+  <h2>B.4 · RANSAC and automatic mosaics</h2>
+  <p>I ran 5,000 four-point RANSAC trials with a 5-pixel reprojection threshold at the original image resolution. I refitted the homography using the largest inlier set, then used the same bilinear inverse warping and feathering as Part A.</p>
+  <article>
+    <h3>UAVs@Berkeley lab</h3>
+    <div class="images two">
+      <figure><a href="assets/lab-mosaic.webp"><img src="assets/lab-mosaic.webp" width="2400" height="1639" loading="lazy" alt="Lab mosaic aligned using manually selected correspondences"></a><figcaption>Manual correspondences</figcaption></figure>
+      <figure><a href="assets/part-b/lab-automatic-mosaic.webp"><img src="assets/part-b/lab-automatic-mosaic.webp" width="2400" height="1714" loading="lazy" alt="Lab mosaic aligned using automatically matched features and RANSAC"></a><figcaption>Automatic correspondences and RANSAC</figcaption></figure>
+    </div>
+  </article>
+  <article>
+    <h3>Wheeler Hall exterior</h3>
+    <div class="images two">
+      <figure><a href="assets/exterior-mosaic.webp"><img src="assets/exterior-mosaic.webp" width="2400" height="1605" loading="lazy" alt="Exterior mosaic aligned using manually selected correspondences"></a><figcaption>Manual correspondences</figcaption></figure>
+      <figure><a href="assets/part-b/exterior-automatic-mosaic.webp"><img src="assets/part-b/exterior-automatic-mosaic.webp" width="2400" height="1581" loading="lazy" alt="Exterior mosaic aligned using automatically matched features and RANSAC"></a><figcaption>Automatic correspondences and RANSAC</figcaption></figure>
+    </div>
+  </article>
+  <article>
+    <h3>Wheeler Hall interior</h3>
+    <div class="images two">
+      <figure><a href="assets/interior-mosaic.webp"><img src="assets/interior-mosaic.webp" width="2371" height="1700" loading="lazy" alt="Interior mosaic aligned using manually selected correspondences"></a><figcaption>Manual correspondences</figcaption></figure>
+      <figure><a href="assets/part-b/interior-automatic-mosaic.webp"><img src="assets/part-b/interior-automatic-mosaic.webp" width="2400" height="1699" loading="lazy" alt="Interior mosaic aligned using automatically matched features and RANSAC"></a><figcaption>Automatic correspondences and RANSAC</figcaption></figure>
+    </div>
+  </article>
+</section>
 </main>
-<footer>Grant Luo · CS180 Project 4, Part A · <a href="https://cal-cs180.github.io/fa26/hw/proj3/partA.html">Assignment instructions</a></footer>
+<footer>Grant Luo · CS180 Project 4 · <a href="https://cal-cs180.github.io/fa26/hw/proj3/partA.html">Part A handout</a> · <a href="https://cal-cs180.github.io/fa26/hw/proj3/partB.html">Part B handout</a></footer>
 </body>
 </html>
